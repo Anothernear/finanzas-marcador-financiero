@@ -11,4 +11,4 @@
 
 2. **Ejecutar la aplicación:**
    ```bash
-   streamlit run app.py
+   streamlit run proyecto.py
