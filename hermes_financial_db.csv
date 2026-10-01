@@ -1,15 +1,17 @@
-fecha,tipo,monto,concepto,es_costo_directo
-2026-09-24,venta,2200.0,Ventas del día (Abarrotes),False
-2026-09-25,venta,2500.0,Ventas del día,False
-2026-09-26,venta,1900.0,Ventas del día,False
-2026-09-27,venta,2800.0,Ventas del fin de semana,False
-2026-09-28,venta,2100.0,Ventas del día,False
-2026-09-29,venta,2300.0,Ventas del día,False
-2026-09-30,venta,2400.0,Ventas del día,False
-2026-09-24,gasto,1300.0,Compra de refrescos y botanas (Mercancía),True
-2026-09-26,gasto,1500.0,Compra de lácteos y embutidos (Mercancía),True
-2026-09-28,gasto,2000.0,Abarrotes secos y enlatados (Mercancía),True
-2026-09-30,gasto,1400.0,"Frutas, verduras y pan (Mercancía)",True
-2026-09-25,gasto,1200.0,Renta de local (Semanal),False
-2026-09-27,gasto,450.0,Luz eléctrica y refrigeración,False
-2026-09-29,gasto,1400.0,Sueldo de ayudante (Semanal),False
+fecha,tipo,monto,concepto,es_costo_directo,metodo_pago
+2026-09-24,venta,2200.0,Ventas del día (Abarrotes),False,💵 Efectivo
+2026-09-25,venta,2500.0,Ventas del día,False,💵 Efectivo
+2026-09-26,venta,1900.0,Ventas del día,False,💵 Efectivo
+2026-09-27,venta,2800.0,Ventas del fin de semana,False,💵 Efectivo
+2026-09-28,venta,2100.0,Ventas del día,False,💵 Efectivo
+2026-09-29,venta,2300.0,Ventas del día,False,💵 Efectivo
+2026-09-30,venta,2400.0,Ventas del día,False,💵 Efectivo
+2026-09-24,gasto,1300.0,Compra de refrescos y botanas (Mercancía),True,💵 Efectivo
+2026-09-26,gasto,1500.0,Compra de lácteos y embutidos (Mercancía),True,💵 Efectivo
+2026-09-28,gasto,2000.0,Abarrotes secos y enlatados (Mercancía),True,💵 Efectivo
+2026-09-30,gasto,1400.0,"Frutas, verduras y pan (Mercancía)",True,💵 Efectivo
+2026-09-25,gasto,1200.0,Renta de local (Semanal),False,💵 Efectivo
+2026-09-27,gasto,450.0,Luz eléctrica y refrigeración,False,💵 Efectivo
+2026-09-29,gasto,1400.0,Sueldo de ayudante (Semanal),False,💵 Efectivo
+2026-09-30,venta,10.0,Ventas del día,False,🏦 Transferencia
+2026-09-30,venta,10.0,Ventas del día,False,💳 Tarjeta Crédito
