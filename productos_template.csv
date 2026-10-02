@@ -1,0 +1,11 @@
+producto,categoria,costo_compra,precio_venta,unidades_vendidas_hoy,inventario
+Coca-Cola 600ml,Bebidas,13.0,18.0,10,43
+Gansito Marinela,Snacks,14.0,18.0,5,50
+Leche Alpura 1L,Lácteos,21.0,26.0,8,48
+Frijol Pinto 1kg,Abarrotes,30.0,42.0,3,48
+Huevos (Docena),Abarrotes,28.0,38.0,4,48
+Pan Bimbo Blanco,Panadería,35.0,45.0,2,43
+Sabritas Sal 42g,Snacks,12.0,16.0,7,50
+Tortillas 1kg,Alimentos,18.0,22.0,15,50
+Atún Dolores en Agua,Abarrotes,16.0,21.0,4,50
+Cerveza Corona 355ml,Bebidas,15.0,22.0,12,50

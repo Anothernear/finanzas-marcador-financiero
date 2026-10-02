@@ -3,13 +3,14 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import os
+import json
 from datetime import datetime, date
 
 # ==========================================
 # 1. CONFIGURACIÓN DE PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Hermes · Marcador Financiero",
+    page_title="Marcador Financiero & Control de Punto de Venta",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -50,6 +51,11 @@ PERFILES_RIESGO_ZONA = {
 
 METODOS_PAGO = ["💵 Efectivo", "🏦 Transferencia", "💳 Tarjeta Débito", "💳 Tarjeta Crédito"]
 
+def generar_folio_ticket(df):
+    fecha_num = date.today().strftime("%Y%m%d")
+    cant_ventas = len(df[df['tipo'] == 'venta']) + 1 if not df.empty else 1
+    return f"TK-{fecha_num}-{cant_ventas:04d}"
+
 def cargar_y_validar_db():
     hoy = date.today().strftime("%Y-%m-%d")
     ayer = (date.today() - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
@@ -61,20 +67,20 @@ def cargar_y_validar_db():
 
     if not os.path.exists(CSV_FILE):
         sample_data = [
-            {"fecha": hace6, "tipo": "venta", "monto": 2200.0, "concepto": "Ventas del día (Abarrotes)", "es_costo_directo": False, "metodo_pago": "💵 Efectivo"},
-            {"fecha": hace5, "tipo": "venta", "monto": 2500.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💵 Efectivo"},
-            {"fecha": hace4, "tipo": "venta", "monto": 1900.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "🏦 Transferencia"},
-            {"fecha": hace3, "tipo": "venta", "monto": 2800.0, "concepto": "Ventas del fin de semana", "es_costo_directo": False, "metodo_pago": "💳 Tarjeta Débito"},
-            {"fecha": hace2, "tipo": "venta", "monto": 2100.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💵 Efectivo"},
-            {"fecha": ayer, "tipo": "venta", "monto": 2300.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💳 Tarjeta Crédito"},
-            {"fecha": hoy, "tipo": "venta", "monto": 2400.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💵 Efectivo"},
-            {"fecha": hace6, "tipo": "gasto", "monto": 1300.0, "concepto": "Compra de refrescos y botanas (Mercancía)", "es_costo_directo": True, "metodo_pago": ""},
-            {"fecha": hace4, "tipo": "gasto", "monto": 1500.0, "concepto": "Compra de lácteos y embutidos (Mercancía)", "es_costo_directo": True, "metodo_pago": ""},
-            {"fecha": hace2, "tipo": "gasto", "monto": 2000.0, "concepto": "Abarrotes secos y enlatados (Mercancía)", "es_costo_directo": True, "metodo_pago": ""},
-            {"fecha": hoy, "tipo": "gasto", "monto": 1400.0, "concepto": "Frutas, verduras y pan (Mercancía)", "es_costo_directo": True, "metodo_pago": ""},
-            {"fecha": hace5, "tipo": "gasto", "monto": 1200.0, "concepto": "Renta de local (Semanal)", "es_costo_directo": False, "metodo_pago": ""},
-            {"fecha": hace3, "tipo": "gasto", "monto": 450.0, "concepto": "Luz eléctrica y refrigeración", "es_costo_directo": False, "metodo_pago": ""},
-            {"fecha": ayer, "tipo": "gasto", "monto": 1400.0, "concepto": "Sueldo de ayudante (Semanal)", "es_costo_directo": False, "metodo_pago": ""},
+            {"fecha": hace6, "hora": "09:30", "tipo": "venta", "monto": 2200.0, "concepto": "Ventas del día (Abarrotes)", "es_costo_directo": False, "metodo_pago": "💵 Efectivo", "folio": "TK-20260926-0001", "productos_detalle": ""},
+            {"fecha": hace5, "hora": "11:15", "tipo": "venta", "monto": 2500.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💵 Efectivo", "folio": "TK-20260927-0001", "productos_detalle": ""},
+            {"fecha": hace4, "hora": "14:20", "tipo": "venta", "monto": 1900.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "🏦 Transferencia", "folio": "TK-20260928-0001", "productos_detalle": ""},
+            {"fecha": hace3, "hora": "17:45", "tipo": "venta", "monto": 2800.0, "concepto": "Ventas del fin de semana", "es_costo_directo": False, "metodo_pago": "💳 Tarjeta Débito", "folio": "TK-20260929-0001", "productos_detalle": ""},
+            {"fecha": hace2, "hora": "10:00", "tipo": "venta", "monto": 2100.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💵 Efectivo", "folio": "TK-20260930-0001", "productos_detalle": ""},
+            {"fecha": ayer, "hora": "18:30", "tipo": "venta", "monto": 2300.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💳 Tarjeta Crédito", "folio": "TK-20261001-0001", "productos_detalle": ""},
+            {"fecha": hoy, "hora": "12:00", "tipo": "venta", "monto": 2400.0, "concepto": "Ventas del día", "es_costo_directo": False, "metodo_pago": "💵 Efectivo", "folio": "TK-20261002-0001", "productos_detalle": ""},
+            {"fecha": hace6, "hora": "10:00", "tipo": "gasto", "monto": 1300.0, "concepto": "Compra de refrescos y botanas (Mercancía)", "es_costo_directo": True, "metodo_pago": "", "folio": "", "productos_detalle": ""},
+            {"fecha": hace4, "hora": "12:00", "tipo": "gasto", "monto": 1500.0, "concepto": "Compra de lácteos y embutidos (Mercancía)", "es_costo_directo": True, "metodo_pago": "", "folio": "", "productos_detalle": ""},
+            {"fecha": hace2, "hora": "15:00", "tipo": "gasto", "monto": 2000.0, "concepto": "Abarrotes secos y enlatados (Mercancía)", "es_costo_directo": True, "metodo_pago": "", "folio": "", "productos_detalle": ""},
+            {"fecha": hoy, "hora": "09:00", "tipo": "gasto", "monto": 1400.0, "concepto": "Frutas, verduras y pan (Mercancía)", "es_costo_directo": True, "metodo_pago": "", "folio": "", "productos_detalle": ""},
+            {"fecha": hace5, "hora": "10:00", "tipo": "gasto", "monto": 1200.0, "concepto": "Renta de local (Semanal)", "es_costo_directo": False, "metodo_pago": "", "folio": "", "productos_detalle": ""},
+            {"fecha": hace3, "hora": "11:00", "tipo": "gasto", "monto": 450.0, "concepto": "Luz eléctrica y refrigeración", "es_costo_directo": False, "metodo_pago": "", "folio": "", "productos_detalle": ""},
+            {"fecha": ayer, "hora": "19:00", "tipo": "gasto", "monto": 1400.0, "concepto": "Sueldo de ayudante (Semanal)", "es_costo_directo": False, "metodo_pago": "", "folio": "", "productos_detalle": ""},
         ]
         df = pd.DataFrame(sample_data)
         df.to_csv(CSV_FILE, index=False)
@@ -85,6 +91,12 @@ def cargar_y_validar_db():
         df['es_costo_directo'] = False
     if 'metodo_pago' not in df.columns:
         df['metodo_pago'] = ""
+    if 'hora' not in df.columns:
+        df['hora'] = "12:00"
+    if 'folio' not in df.columns:
+        df['folio'] = ""
+    if 'productos_detalle' not in df.columns:
+        df['productos_detalle'] = ""
     df.to_csv(CSV_FILE, index=False)
     return df
 
@@ -92,6 +104,147 @@ def restaurar_datos_demo():
     if os.path.exists(CSV_FILE):
         os.remove(CSV_FILE)
     return cargar_y_validar_db()
+
+# ==========================================
+# MODALES / DIÁLOGOS INTERACTIVOS DE RESUMEN
+# ==========================================
+@st.dialog("☀️ Detalle de Ventas Registradas Hoy")
+def mostrar_modal_ventas_hoy(df_db, d):
+    hoy_str = date.today().strftime("%Y-%m-%d")
+    df_hoy = df_db[(df_db['tipo'] == 'venta') & (df_db['fecha'] == hoy_str)]
+    st.metric("Venta Total Registrada Hoy", f"${d['venta_hoy']:,.2f}", delta=f"{len(df_hoy)} ticket(s) hoy")
+    st.markdown("---")
+    if not df_hoy.empty:
+        df_disp = df_hoy[['folio', 'hora', 'concepto', 'monto', 'metodo_pago']].copy()
+        df_disp.columns = ['Folio Ticket', 'Hora', 'Concepto / Productos', 'Monto ($)', 'Método de Cobro']
+        st.dataframe(df_disp, use_container_width=True)
+    else:
+        st.info("No hay ventas registradas con la fecha de hoy.")
+
+@st.dialog("📜 Historial Completo de Ventas Estratificado")
+def mostrar_modal_ventas_totales(df_db, m):
+    df_ventas = df_db[df_db['tipo'] == 'venta'].copy()
+    st.metric("Ingresos Totales Históricos", f"${m['ingresos_totales']:,.2f}", delta=f"{len(df_ventas)} transacciones registradas")
+    st.markdown("---")
+    if not df_ventas.empty:
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            busqueda = st.text_input("🔍 Buscar por Folio o Producto:")
+        with col_f2:
+            metodo_f = st.selectbox("Filtrar por Método de Cobro:", ["Todos"] + METODOS_PAGO)
+        
+        df_filtrado = df_ventas.copy()
+        if busqueda:
+            df_filtrado = df_filtrado[
+                df_filtrado['folio'].astype(str).str.contains(busqueda, case=False, na=False) |
+                df_filtrado['concepto'].astype(str).str.contains(busqueda, case=False, na=False)
+            ]
+        if metodo_f != "Todos":
+            df_filtrado = df_filtrado[df_filtrado['metodo_pago'] == metodo_f]
+            
+        df_disp = df_filtrado[['fecha', 'hora', 'folio', 'concepto', 'monto', 'metodo_pago']].copy()
+        df_disp.columns = ['Fecha', 'Hora', 'Folio Ticket', 'Concepto / Productos', 'Monto ($)', 'Método de Cobro']
+        st.dataframe(df_disp.sort_values(by=['Fecha', 'Hora'], ascending=False), use_container_width=True)
+    else:
+        st.info("No se han registrado ventas aún.")
+
+def agrupar_ventas_por_intervalo_hora(df_ventas, opcion_intervalo):
+    df = df_ventas.copy()
+    
+    def extraer_hora(h_str):
+        try:
+            return int(str(h_str).split(":")[0])
+        except Exception:
+            return 12
+            
+    df['hora_int'] = df['hora'].apply(extraer_hora)
+    
+    if opcion_intervalo == "Franjas Comerciales":
+        def rango_franja(h):
+            if 6 <= h < 11:
+                return "1. 🌅 Mañana (06:00 - 11:00)"
+            elif 11 <= h < 15:
+                return "2. ☀️ Medio día (11:00 - 15:00)"
+            elif 15 <= h < 19:
+                return "3. 🌆 Tarde (15:00 - 19:00)"
+            else:
+                return "4. 🌙 Noche (19:00 - 23:00)"
+        df['intervalo_lbl'] = df['hora_int'].apply(rango_franja)
+        df_group = df.groupby('intervalo_lbl', as_index=False)['monto'].sum()
+        df_group = df_group.sort_values(by='intervalo_lbl')
+    else:
+        horas_num = int(opcion_intervalo.split()[0])
+        def rango_bin(h):
+            start = (h // horas_num) * horas_num
+            end = min(24, start + horas_num)
+            return f"{start:02d}:00 - {end:02d}:00"
+            
+        df['intervalo_lbl'] = df['hora_int'].apply(rango_bin)
+        df_group = df.groupby('intervalo_lbl', as_index=False)['monto'].sum()
+        df_group = df_group.sort_values(by='intervalo_lbl')
+        
+    return df_group
+
+@st.dialog("📊 Análisis de Días Récord y Horarios Pico")
+def mostrar_modal_horarios_y_dias(df_db):
+    df_ventas = df_db[df_db['tipo'] == 'venta'].copy()
+    if df_ventas.empty:
+        st.info("Registra ventas para ver el análisis de días y horarios pico.")
+        return
+        
+    df_diario = df_ventas.groupby('fecha')['monto'].sum().reset_index()
+    dia_max = df_diario.loc[df_diario['monto'].idxmax()]
+    
+    fecha_dt = pd.to_datetime(dia_max['fecha'])
+    dias_semana_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    nombre_dia = dias_semana_es[fecha_dt.weekday()]
+    
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        st.success(f"🏆 **Día con Mayor Venta Registrada:**\n\n**{nombre_dia} ({dia_max['fecha']})**\n\n💰 Venta: **${dia_max['monto']:,.2f}**")
+    
+    with col_d2:
+        df_ventas['dia_nombre'] = pd.to_datetime(df_ventas['fecha']).apply(lambda x: dias_semana_es[x.weekday()])
+        dia_prom = df_ventas.groupby('dia_nombre')['monto'].mean().reset_index()
+        dia_top_prom = dia_prom.loc[dia_prom['monto'].idxmax()]
+        st.info(f"📅 **Día más Fuerte en Promedio:**\n\n**{dia_top_prom['dia_nombre']}**\n\nPromedio: **${dia_top_prom['monto']:,.2f} / día**")
+
+    st.markdown("---")
+    st.markdown("### ⏰ Histograma de Ventas por Intervalo Horario")
+    
+    col_int1, col_int2 = st.columns([2, 1])
+    with col_int1:
+        opcion_intervalo = st.selectbox(
+            "⏱️ Modificar intervalo de tiempo por hora:",
+            ["1 hora", "2 horas", "3 horas", "4 horas", "6 horas", "Franjas Comerciales"],
+            index=0,
+            key="modal_sel_intervalo"
+        )
+    with col_int2:
+        st.caption("Ajusta las barras del histograma para analizar tus ventas en franjas más detalladas o amplias.")
+        
+    df_horario = agrupar_ventas_por_intervalo_hora(df_ventas, opcion_intervalo)
+    
+    fig_h = px.bar(
+        df_horario, x='intervalo_lbl', y='monto',
+        title=f"Histograma de Ventas por Intervalo ({opcion_intervalo})",
+        labels={'intervalo_lbl': 'Intervalo de Horas', 'monto': 'Venta Acumulada ($)'},
+        color='monto',
+        color_continuous_scale=['#38bdf8', '#0ea5e9', '#0284c7']
+    )
+    fig_h.update_layout(xaxis_title="Intervalos por Hora", yaxis_title="Venta Total ($)")
+    st.plotly_chart(fig_h, use_container_width=True)
+
+@st.dialog("💰 Desglose Financiero de Ganancia Neta")
+def mostrar_modal_ganancia_neta(m, r):
+    st.markdown("### 📊 Cascada de Ganancia Real")
+    st.write(f"➕ **Ventas Totales Cobradas:** ${m['ingresos_totales']:,.2f}")
+    st.write(f"➖ **Costos Variables (Mercancía):** -${m['costos_variables']:,.2f}")
+    st.write(f"➖ **Costos Fijos (Renta, Luz, etc.):** -${m['costos_fijos']:,.2f}")
+    st.markdown("---")
+    st.markdown(f"🟢 **Utilidad Operativa Neta:** **${m['utilidad_neta']:,.2f}**")
+    st.write(f"🛡️ *Merma Estimada por Riesgo de Zona ({r['riesgo_merma_pct']}%):* -${r['merma_estimada_pesos']:,.2f}")
+    st.markdown(f"💎 **Ganancia Ajustada por Riesgo:** **${r['utilidad_ajustada_riesgo']:,.2f}**")
 
 # ==========================================
 # 3. ESTADO DE SESIÓN
@@ -465,71 +618,255 @@ with col_head2:
     st.metric("Riesgo de Zona", f"+{r['riesgo_seguridad_pct']}%", help="Prima de riesgo adicional por la ubicación del negocio")
     st.metric("Registros totales", len(df_db))
 
+# Mostrar Ticket si se acaba de generar una venta
+if st.session_state.get("ultimo_ticket"):
+    tk = st.session_state.ultimo_ticket
+    with st.container(border=True):
+        col_tk1, col_tk2 = st.columns([3, 1])
+        with col_tk1:
+            st.markdown(f"### 🧾 Ticket de Venta Generado — Folio: `{tk['folio']}`")
+            st.caption(f"📅 **Fecha:** {tk['fecha']} | ⏰ **Hora:** {tk['hora']} | 💳 **Pago:** {tk['metodo_pago']}")
+            if tk.get("items"):
+                st.markdown("**Detalle de la cuenta:**")
+                for item_t in tk["items"]:
+                    st.write(f"• **{item_t['cantidad']}x {item_t['producto']}** @ ${item_t['precio_unitario']:,.2f} c/u = **${item_t['subtotal']:,.2f}**")
+            st.markdown(f"#### **Total Cobrado: ${tk['monto']:,.2f}**")
+        with col_tk2:
+            if st.button("❌ Cerrar Ticket", use_container_width=True):
+                del st.session_state.ultimo_ticket
+                st.rerun()
+
 st.markdown("---")
 
 # ==========================================
-# 8. BARRA LATERAL
+# 8. BARRA LATERAL (PUNTO DE VENTA AUTOMÁTICO)
 # ==========================================
 with st.sidebar:
     st.markdown("### 📥 Registrar Dinero")
     st.caption("Apunta lo que entra y lo que sale:")
 
-    with st.form("form_movimiento"):
-        tipo_opcion = st.selectbox(
-            "¿Qué movimiento vas a ingresar?",
-            [
-                "🟢 Venta (Dinero que cobraste)",
-                "🟠 Compra de Mercancía / Insumos (Costo Variable)",
-                "🔴 Gasto del Local / Negocio (Costo Fijo)"
-            ]
-        )
+    tipo_opcion = st.selectbox(
+        "¿Qué movimiento vas a ingresar?",
+        [
+            "🟢 Venta (Dinero que cobraste)",
+            "🟠 Compra de Mercancía / Insumos (Costo Variable)",
+            "🔴 Gasto del Local / Negocio (Costo Fijo)"
+        ]
+    )
+    
+    es_venta = "Venta" in tipo_opcion
+    es_costo_var = "Mercancía" in tipo_opcion
 
-        monto_input = st.number_input("Monto en dinero ($)", min_value=1.0, step=50.0, value=150.0)
+    # Variables de captura
+    monto_final = 0.0
+    concepto_final = ""
+    df_inv = None
+    archivo_productos = "productos_template.csv"
 
-        if "Venta" in tipo_opcion:
-            concepto_def = "Ventas del día"
-            ayuda_concepto = "Ej: Ventas del día, pedido especial, etc."
+    # Estado del carrito y control de selección
+    if "carrito_compras" not in st.session_state:
+        st.session_state.carrito_compras = []
+    if "prod_sel_prev" not in st.session_state:
+        st.session_state.prod_sel_prev = None
+    if "cant_prod_sel" not in st.session_state:
+        st.session_state.cant_prod_sel = 1
+
+    if es_venta:
+        # Cargar inventario
+        if os.path.exists(archivo_productos):
+            df_inv = pd.read_csv(archivo_productos)
+            if 'inventario' not in df_inv.columns:
+                df_inv['inventario'] = 50
+        
+        tipo_venta = st.radio("Tipo de venta:", ["General (Libre)", "Producto del Inventario (Cuenta)"], horizontal=True)
+        
+        if tipo_venta == "Producto del Inventario (Cuenta)" and df_inv is not None and not df_inv.empty:
+            lista_prods = df_inv['producto'].tolist()
+            
+            producto_sel = st.selectbox("Selecciona un producto:", lista_prods, key="sel_prod_sidebar")
+            
+            # Si cambió el producto seleccionado en el dropdown, reiniciar cantidad a 1
+            if st.session_state.prod_sel_prev != producto_sel:
+                st.session_state.cant_prod_sel = 1
+                st.session_state.prod_sel_prev = producto_sel
+                
+            producto_idx = df_inv.index[df_inv['producto'] == producto_sel].tolist()[0]
+            precio_unitario = float(df_inv.at[producto_idx, 'precio_venta'])
+            inv_disponible = int(df_inv.at[producto_idx, 'inventario'])
+            
+            st.caption(f"Stock disponible: {inv_disponible} unidades | Precio: ${precio_unitario:,.2f}")
+            
+            cantidad_input = st.number_input(
+                "Cantidad a comprar",
+                min_value=1,
+                max_value=max(inv_disponible, 1),
+                step=1,
+                value=st.session_state.cant_prod_sel,
+                key="cant_input_sidebar"
+            )
+            st.session_state.cant_prod_sel = cantidad_input
+
+            # AUTO-AGREGAR O ACTUALIZAR AUTOMÁTICAMENTE EN LA CUENTA
+            encontrado = False
+            for item in st.session_state.carrito_compras:
+                if item['producto'] == producto_sel:
+                    item['cantidad'] = cantidad_input
+                    item['subtotal'] = cantidad_input * precio_unitario
+                    item['producto_idx'] = producto_idx
+                    encontrado = True
+                    break
+            if not encontrado:
+                st.session_state.carrito_compras.append({
+                    "producto": producto_sel,
+                    "producto_idx": producto_idx,
+                    "cantidad": cantidad_input,
+                    "precio_unitario": precio_unitario,
+                    "subtotal": cantidad_input * precio_unitario
+                })
+
+            # Mostrar resumen de la cuenta
+            if len(st.session_state.carrito_compras) > 0:
+                st.markdown("---")
+                st.markdown("🛒 **Cuenta Actual del Cliente:**")
+                total_cuenta = 0.0
+                conceptos_lista = []
+                
+                indices_a_borrar = []
+                for idx_item, item in enumerate(st.session_state.carrito_compras):
+                    col_ci1, col_ci2 = st.columns([3, 1])
+                    with col_ci1:
+                        st.write(f"• **{item['cantidad']}x {item['producto']}** (${item['subtotal']:,.2f})")
+                    with col_ci2:
+                        if st.button("❌", key=f"del_cart_{idx_item}_{item['producto']}"):
+                            indices_a_borrar.append(idx_item)
+                            
+                    total_cuenta += item['subtotal']
+                    conceptos_lista.append(f"{item['cantidad']}x {item['producto']}")
+
+                if indices_a_borrar:
+                    for idx_b in sorted(indices_a_borrar, reverse=True):
+                        st.session_state.carrito_compras.pop(idx_b)
+                    st.rerun()
+                
+                st.markdown(f"#### **Total Cuenta: ${total_cuenta:,.2f}**")
+                
+                monto_final = total_cuenta
+                concepto_final = "Venta: " + ", ".join(conceptos_lista)
+                
+                if st.button("🗑️ Eliminar Cuenta", use_container_width=True):
+                    st.session_state.carrito_compras = []
+                    st.session_state.prod_sel_prev = None
+                    st.rerun()
+            else:
+                monto_final = 0.0
+                concepto_final = ""
+                st.caption("La cuenta del cliente está vacía.")
+
             mostrar_pago = True
-        elif "Mercancía" in tipo_opcion:
+        else:
+            monto_final = st.number_input("Monto en dinero ($)", min_value=1.0, step=50.0, value=150.0)
+            concepto_final = st.text_input("¿En qué concepto o motivo?", value="Ventas del día", help="Ej: Ventas del día, pedido especial, etc.")
+            mostrar_pago = True
+    else:
+        monto_final = st.number_input("Monto en dinero ($)", min_value=1.0, step=50.0, value=150.0)
+        if es_costo_var:
             concepto_def = "Compra de refrescos / abarrotes"
             ayuda_concepto = "Mercancía para revender o ingredientes."
-            mostrar_pago = False
         else:
             concepto_def = "Renta del local"
             ayuda_concepto = "Gastos fijos: Renta, luz, sueldos fijos, internet."
-            mostrar_pago = False
+            
+        concepto_final = st.text_input("¿En qué concepto o motivo?", value=concepto_def, help=ayuda_concepto)
+        mostrar_pago = False
 
-        concepto_input = st.text_input("¿En qué concepto o motivo?", value=concepto_def, help=ayuda_concepto)
+    hoy_fecha = date.today()
+    fecha_input = st.date_input(
+        "📅 Fecha del movimiento:",
+        value=hoy_fecha,
+        max_value=hoy_fecha,
+        help="No se permiten fechas futuras. Puedes registrar movimientos de días anteriores."
+    )
 
-        hoy_fecha = date.today()
-        fecha_input = st.date_input(
-            "📅 Fecha del movimiento:",
-            value=hoy_fecha,
-            max_value=hoy_fecha,
-            help="No se permiten fechas futuras. Puedes registrar movimientos de días anteriores."
-        )
+    if mostrar_pago:
+        metodo_pago_input = st.selectbox("💳 Método de cobro:", METODOS_PAGO)
+    else:
+        metodo_pago_input = ""
 
-        if mostrar_pago:
-            metodo_pago_input = st.selectbox("💳 Método de cobro:", METODOS_PAGO)
+    btn_guardar = st.button("💾 Cobrar y Generar Ticket", use_container_width=True, type="primary")
+    if btn_guardar:
+        if es_venta and tipo_venta == "Producto del Inventario (Cuenta)" and len(st.session_state.carrito_compras) == 0:
+            st.error("⚠️ La cuenta está vacía. Selecciona un producto antes de cobrar.")
         else:
-            metodo_pago_input = ""
+            fecha_str = fecha_input.strftime("%Y-%m-%d")
+            hora_str = datetime.now().strftime("%H:%M")
+            folio_str = generar_folio_ticket(df_db) if es_venta else ""
 
-        btn_guardar = st.form_submit_button("💾 Guardar Movimiento", use_container_width=True)
-        if btn_guardar:
-            es_venta = "Venta" in tipo_opcion
-            es_costo_var = "Mercancía" in tipo_opcion
+            detalle_json = ""
+            if es_venta and tipo_venta == "Producto del Inventario (Cuenta)" and st.session_state.carrito_compras:
+                detalle_json = json.dumps([
+                    {"producto": it['producto'], "cantidad": it['cantidad'], "precio_unitario": it['precio_unitario'], "subtotal": it['subtotal']}
+                    for it in st.session_state.carrito_compras
+                ], ensure_ascii=False)
+
             nuevo_reg = {
-                "fecha": fecha_input.strftime("%Y-%m-%d"),
+                "fecha": fecha_str,
+                "hora": hora_str,
                 "tipo": "venta" if es_venta else "gasto",
-                "monto": float(monto_input),
-                "concepto": concepto_input.strip() if concepto_input.strip() else ("Venta" if es_venta else "Gasto"),
+                "monto": float(monto_final),
+                "concepto": concepto_final.strip() if concepto_final.strip() else ("Venta" if es_venta else "Gasto"),
                 "es_costo_directo": es_costo_var,
-                "metodo_pago": metodo_pago_input if es_venta else ""
+                "metodo_pago": metodo_pago_input if es_venta else "",
+                "folio": folio_str,
+                "productos_detalle": detalle_json
             }
             df_actualizado = pd.concat([df_db, pd.DataFrame([nuevo_reg])], ignore_index=True)
             df_actualizado.to_csv(CSV_FILE, index=False)
-            st.success("✅ ¡Movimiento guardado!")
+            
+            # Descontar inventario de todos los productos en la cuenta
+            if es_venta and tipo_venta == "Producto del Inventario (Cuenta)" and df_inv is not None:
+                for item in st.session_state.carrito_compras:
+                    p_idx = item['producto_idx']
+                    cant = item['cantidad']
+                    df_inv.at[p_idx, 'inventario'] = max(0, int(df_inv.at[p_idx, 'inventario']) - cant)
+                df_inv.to_csv(archivo_productos, index=False)
+
+                # Guardar último ticket generado para mostrar en pantalla
+                st.session_state.ultimo_ticket = {
+                    "folio": folio_str,
+                    "fecha": fecha_str,
+                    "hora": hora_str,
+                    "monto": monto_final,
+                    "metodo_pago": metodo_pago_input,
+                    "concepto": concepto_final,
+                    "items": list(st.session_state.carrito_compras)
+                }
+                st.session_state.carrito_compras = []
+                st.session_state.prod_sel_prev = None
+                
+            st.success(f"✅ ¡Venta cobrada con éxito! Folio: {folio_str if folio_str else 'N/A'}")
             st.rerun()
+        
+    st.markdown("---")
+    
+    # === ALERTA DE META DIARIA ===
+    ventas_hoy = d.get('venta_hoy', 0.0)
+    pe_diario = m['punto_equilibrio_diario']
+    falta_vender = max(0, pe_diario - ventas_hoy)
+    
+    if falta_vender > 0:
+        st.markdown(f"""
+        <div class='warning-box' style='padding:12px; margin-bottom:10px;'>
+            <strong style='font-size:0.95rem; color:#b45309;'>🎯 Meta del día:</strong><br>
+            Aún necesitas vender <b style='color:#b45309;'>${falta_vender:,.2f}</b> hoy para salir rentable (cubrir costos fijos).
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class='success-box' style='padding:12px; margin-bottom:10px;'>
+            <strong style='font-size:0.95rem; color:#065f46;'>🎉 ¡Meta alcanzada!</strong><br>
+            Ya cubriste los costos del día. Todo lo demás es ganancia libre.
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### ⚙️ Opciones del Negocio")
@@ -540,7 +877,7 @@ with st.sidebar:
         st.rerun()
 
     if st.button("🗑️ Vaciar Registros (Empezar en 0)", use_container_width=True):
-        df_vacio = pd.DataFrame(columns=['fecha', 'tipo', 'monto', 'concepto', 'es_costo_directo', 'metodo_pago'])
+        df_vacio = pd.DataFrame(columns=['fecha', 'hora', 'tipo', 'monto', 'concepto', 'es_costo_directo', 'metodo_pago', 'folio', 'productos_detalle'])
         df_vacio.to_csv(CSV_FILE, index=False)
         st.success("Base de datos limpia.")
         st.rerun()
@@ -550,7 +887,7 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 9. SECCIÓN 1: RESUMEN DE VENTAS DEL DÍA
+# 9. SECCIÓN 1: RESUMEN DE VENTAS CON BOTONES INTERACTIVOS
 # ==========================================
 st.markdown("### ☀️ Resumen de Ventas")
 
@@ -563,6 +900,8 @@ with col_v1:
             f"${d['venta_hoy']:,.2f}",
             help="Suma de todas las ventas registradas con fecha de hoy."
         )
+        if st.button("🔍 Ver Ventas de Hoy", use_container_width=True):
+            mostrar_modal_ventas_hoy(df_db, d)
 
 with col_v2:
     with st.container(border=True):
@@ -571,6 +910,8 @@ with col_v2:
             f"${m['ingresos_totales']:,.2f}",
             help="Suma total de todas las ventas registradas en la base de datos."
         )
+        if st.button("📜 Historial de Ventas", use_container_width=True):
+            mostrar_modal_ventas_totales(df_db, m)
 
 with col_v3:
     with st.container(border=True):
@@ -579,6 +920,8 @@ with col_v3:
             f"${m['promedio_venta_diaria']:,.2f}",
             help="Promedio de ventas por día en los días que hay registros."
         )
+        if st.button("⏰ Horarios y Días Pico", use_container_width=True):
+            mostrar_modal_horarios_y_dias(df_db)
 
 with col_v4:
     ganancia_neta_color = "normal" if m['utilidad_neta'] >= 0 else "inverse"
@@ -588,8 +931,10 @@ with col_v4:
             f"${m['utilidad_neta']:,.2f}",
             delta=f"−${r['merma_estimada_pesos']:,.2f} merma",
             delta_color="inverse",
-            help=f"Ventas − Costos − Gastos. La merma estimada (${r['merma_estimada_pesos']:,.2f}) es un riesgo adicional por la zona."
+            help=f"Ventas − Costos − Gastos."
         )
+        if st.button("💡 Desglose de Ganancia", use_container_width=True):
+            mostrar_modal_ganancia_neta(m, r)
 
 st.markdown("---")
 
@@ -724,11 +1069,12 @@ st.markdown("---")
 # ==========================================
 # 13. PESTAÑAS
 # ==========================================
-tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_guia = st.tabs([
+tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_prod, tab_guia = st.tabs([
     "📢 Diagnóstico y Consejos",
     "🛡️ Riesgo y Ubicación",
     "📊 Gráficas",
     "📜 Historial",
+    "📦 Productos y Rentabilidad",
     "🎓 Guía Financiera"
 ])
 
@@ -862,6 +1208,34 @@ with tab_graf:
         fig_van.add_hline(y=0, line_dash="dash", line_color="#64748b", annotation_text="Punto de viabilidad ($0)")
         st.plotly_chart(fig_van, use_container_width=True)
 
+    # Histograma de Ventas con Intervalo Configurable por Hora
+    st.markdown("---")
+    st.markdown("### ⏱️ Histograma Configurable de Ventas por Intervalos de Hora")
+    if not df_ventas_graf.empty:
+        col_hg1, col_hg2 = st.columns([2, 1])
+        with col_hg1:
+            intervalo_tab_sel = st.selectbox(
+                "Modificar intervalo por hora:",
+                ["1 hora", "2 horas", "3 horas", "4 horas", "6 horas", "Franjas Comerciales"],
+                index=1,
+                key="tab_graf_sel_intervalo"
+            )
+        with col_hg2:
+            st.info("💡 **Análisis de Horarios:** Selecciona **1 hora** para detectar la hora pico exacta de cobro o **4 horas** para analizar turnos de trabajo.")
+            
+        df_hist_tab = agrupar_ventas_por_intervalo_hora(df_ventas_graf, intervalo_tab_sel)
+        fig_hist_tab = px.bar(
+            df_hist_tab, x='intervalo_lbl', y='monto',
+            title=f"Histograma de Ventas por Intervalo ({intervalo_tab_sel})",
+            labels={'intervalo_lbl': 'Intervalo de Tiempo', 'monto': 'Venta Acumulada ($)'},
+            color='monto',
+            color_continuous_scale=['#f59e0b', '#0ea5e9', '#10b981']
+        )
+        fig_hist_tab.update_layout(xaxis_title="Intervalos por Hora", yaxis_title="Monto ($)")
+        st.plotly_chart(fig_hist_tab, use_container_width=True)
+    else:
+        st.info("Registra ventas para activar el histograma de intervalos por hora.")
+
 with tab_tabla:
     st.markdown("### 📋 Historial de Transacciones")
 
@@ -892,6 +1266,156 @@ with tab_tabla:
         st.dataframe(df_final.sort_values(by='Fecha', ascending=False), use_container_width=True)
     else:
         st.info("Aún no tienes movimientos registrados.")
+
+with tab_prod:
+    st.markdown("### 📦 Análisis de Rentabilidad e Inventario")
+    st.markdown("Edita tu inventario directamente en la tabla haciendo doble clic en las celdas. Registra tus **Ventas de Hoy** y presiona el botón para descontarlas automáticamente.")
+    
+    archivo_productos = "productos_template.csv"
+    
+    # Crea el archivo automáticamente con Inventario y Ventas si no existe
+    if not os.path.exists(archivo_productos):
+        default_data = "producto,categoria,costo_compra,precio_venta,inventario,unidades_vendidas_hoy\nCoca-Cola 600ml,Bebidas,13.00,18.00,50,0\nGansito Marinela,Snacks,14.00,18.00,30,0\nLeche Alpura 1L,Lácteos,21.00,26.00,20,0\nFrijol Pinto 1kg,Abarrotes,30.00,42.00,15,0\nHuevos (Docena),Abarrotes,28.00,38.00,10,0\nPan Bimbo Blanco,Panadería,35.00,45.00,12,0\nSabritas Sal 42g,Snacks,12.00,16.00,40,0\nTortillas 1kg,Alimentos,18.00,22.00,20,0\nAtún Dolores en Agua,Abarrotes,16.00,21.00,25,0\nCerveza Corona 355ml,Bebidas,15.00,22.00,60,0"
+        with open(archivo_productos, "w", encoding="utf-8") as f:
+            f.write(default_data)
+            
+    df_prod = pd.read_csv(archivo_productos)
+    
+    # Compatibilidad si el archivo viejo no tenía estas columnas
+    if 'inventario' not in df_prod.columns:
+        df_prod['inventario'] = 50
+    if 'unidades_vendidas_hoy' not in df_prod.columns:
+        df_prod['unidades_vendidas_hoy'] = 0
+
+    # Calcular rentabilidad (Estas no se pueden editar manualmente)
+    df_prod['Ganancia Neta ($)'] = df_prod['precio_venta'] - df_prod['costo_compra']
+    df_prod['Rentabilidad (Margen %)'] = (df_prod['Ganancia Neta ($)'] / df_prod['precio_venta']) * 100
+    
+    pe_diario = m['punto_equilibrio_diario']
+    df_prod['Unidades para sacar el día'] = (pe_diario / df_prod['Ganancia Neta ($)']).replace([float('inf'), -float('inf')], 0).clip(lower=0).apply(np.ceil)
+    df_prod.loc[df_prod['Ganancia Neta ($)'] <= 0, 'Unidades para sacar el día'] = np.nan
+    
+    # --- TABLA EDITABLE (El usuario puede cambiar valores directo en la interfaz) ---
+    edited_df = st.data_editor(
+        df_prod,
+        use_container_width=True,
+        num_rows="dynamic", # Permite añadir nuevas filas (productos)
+        disabled=["Ganancia Neta ($)", "Rentabilidad (Margen %)", "Unidades para sacar el día"],
+        column_config={
+            "producto": st.column_config.TextColumn("Producto", required=True),
+            "categoria": st.column_config.TextColumn("Categoría"),
+            "costo_compra": st.column_config.NumberColumn("Costo Compra ($)", format="$%.2f", min_value=0),
+            "precio_venta": st.column_config.NumberColumn("Precio Venta ($)", format="$%.2f", min_value=0),
+            "inventario": st.column_config.NumberColumn("Inventario Actual", min_value=0, step=1),
+            "unidades_vendidas_hoy": st.column_config.NumberColumn("Ventas de Hoy", min_value=0, step=1),
+            "Ganancia Neta ($)": st.column_config.NumberColumn("Ganancia Neta", format="$%.2f"),
+            "Rentabilidad (Margen %)": st.column_config.NumberColumn("Margen", format="%.1f%%"),
+            "Unidades para sacar el día": st.column_config.NumberColumn("Meta Diaria (Unid.)", format="%d")
+        },
+        key="editor_productos"
+    )
+    
+    # --- BOTONES DE ACCIÓN ---
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("💾 Guardar Cambios Manuales", use_container_width=True):
+            cols_to_save = ['producto', 'categoria', 'costo_compra', 'precio_venta', 'inventario', 'unidades_vendidas_hoy']
+            edited_df[cols_to_save].to_csv(archivo_productos, index=False)
+            st.success("¡Datos e inventario guardados!")
+            st.rerun()
+
+    with col2:
+        if st.button("🛒 Procesar Ventas y Descontar Inventario", use_container_width=True):
+            # Restar ventas del inventario y evitar números negativos
+            edited_df['inventario'] = edited_df['inventario'] - edited_df['unidades_vendidas_hoy']
+            edited_df['inventario'] = edited_df['inventario'].clip(lower=0) 
+            
+            # Reiniciar la columna de ventas de hoy a 0
+            edited_df['unidades_vendidas_hoy'] = 0 
+            
+            # Guardar el archivo
+            cols_to_save = ['producto', 'categoria', 'costo_compra', 'precio_venta', 'inventario', 'unidades_vendidas_hoy']
+            edited_df[cols_to_save].to_csv(archivo_productos, index=False)
+            
+            st.success("¡Ventas procesadas exitosamente! El inventario se ha actualizado.")
+            st.rerun()
+
+    # --- ALERTAS E INTERPRETACIONES ---
+    if len(edited_df) > 0 and 'Rentabilidad (Margen %)' in edited_df.columns:
+        try:
+            producto_top = edited_df.loc[edited_df['Rentabilidad (Margen %)'].idxmax()]
+            producto_vol = edited_df.dropna(subset=['Unidades para sacar el día']).loc[edited_df.dropna(subset=['Unidades para sacar el día'])['Unidades para sacar el día'].idxmin()]
+            
+            st.markdown(f"""
+            <div class='warning-box'>
+                <strong style='color:#b45309;'>🚨 Alerta de Ventas Diarias:</strong><br>
+                Para recuperar tu inversión y sacar el día (cubriendo tus <b>${pe_diario:,.2f}</b> de costos operativos diarios), tendrías que vender, por ejemplo, <b>{producto_vol['Unidades para sacar el día']:.0f} unidades de {producto_vol['producto']}</b>.<br><br>
+                💡 <em>Sugerencia estratégica:</em> Concéntrate en impulsar los productos de mayor margen como el <b>{producto_top['producto']}</b> ({producto_top['Rentabilidad (Margen %)']:.1f}% de ganancia).
+            </div>
+            """, unsafe_allow_html=True)
+        except Exception:
+            pass
+
+    # --- PRODUCTO MÁS Y MENOS VENDIDO ---
+    st.markdown("---")
+    st.markdown("### 🏆 Ranking de Ventas por Producto (Más y Menos Vendidos)")
+    
+    prod_counts = {}
+    if os.path.exists(archivo_productos):
+        df_p_all = pd.read_csv(archivo_productos)
+        for _, row_p in df_p_all.iterrows():
+            p_n = str(row_p['producto']).strip()
+            prod_counts[p_n] = {"unidades": 0, "ingresos": 0.0, "precio": float(row_p['precio_venta'])}
+            
+    # Process json details from historical sales
+    df_v_all = df_db[df_db['tipo'] == 'venta']
+    for _, row_v in df_v_all.iterrows():
+        p_det = row_v.get('productos_detalle', '')
+        if p_det and isinstance(p_det, str) and p_det.startswith("["):
+            try:
+                items_det = json.loads(p_det)
+                for it_d in items_det:
+                    pname = str(it_d.get('producto')).strip()
+                    u_cant = int(it_d.get('cantidad', 1))
+                    u_subt = float(it_d.get('subtotal', 0.0))
+                    if pname not in prod_counts:
+                        prod_counts[pname] = {"unidades": 0, "ingresos": 0.0, "precio": float(it_d.get('precio_unitario', 0.0))}
+                    prod_counts[pname]["unidades"] += u_cant
+                    prod_counts[pname]["ingresos"] += u_subt
+            except Exception:
+                pass
+
+    if prod_counts:
+        df_rank = pd.DataFrame([
+            {"producto": k, "unidades": v["unidades"], "ingresos": v["ingresos"]}
+            for k, v in prod_counts.items()
+        ])
+        
+        has_sales = df_rank['unidades'].max() > 0
+        top_seller = df_rank.loc[df_rank['unidades'].idxmax()] if has_sales else None
+        worst_seller = df_rank.loc[df_rank['unidades'].idxmin()] if not df_rank.empty else None
+        
+        col_rank1, col_rank2 = st.columns(2)
+        with col_rank1:
+            if top_seller is not None and top_seller['unidades'] > 0:
+                st.success(f"🏆 **Producto Más Vendido:**\n\n### **{top_seller['producto']}**\n\n📦 **{top_seller['unidades']} unidades vendidas** | 💵 **${top_seller['ingresos']:,.2f} recaudados**")
+            else:
+                st.info("🏆 **Producto Más Vendido:**\n\nRegistra ventas desde el Punto de Venta en la barra lateral para generar métricas en tiempo real.")
+                
+        with col_rank2:
+            if worst_seller is not None:
+                st.warning(f"⚠️ **Producto Menos Vendido:**\n\n### **{worst_seller['producto']}**\n\n📦 **{worst_seller['unidades']} unidades vendidas** | 💡 *Sugerencia: Promociónalo o ajusta su precio.*")
+
+        if has_sales:
+            fig_rank = px.bar(
+                df_rank.sort_values(by='unidades', ascending=True),
+                y='producto', x='unidades', orientation='h',
+                title="📊 Comparativa de Unidades Vendidas por Producto",
+                labels={'unidades': 'Unidades Vendidas', 'producto': 'Producto'},
+                color='unidades',
+                color_continuous_scale=['#f59e0b', '#0ea5e9', '#10b981']
+            )
+            st.plotly_chart(fig_rank, use_container_width=True)
 
 with tab_guia:
     st.markdown("### 🎓 Guía Financiera para no Financieros")
