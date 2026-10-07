@@ -663,13 +663,13 @@ with st.sidebar:
     df_inv = None
     archivo_productos = "productos_template.csv"
 
-    # Estado del carrito y control de selección
+    # Estado del carrito y control de versión de llaves para evitar errores de widget
     if "carrito_compras" not in st.session_state:
         st.session_state.carrito_compras = []
     if "prod_sel_prev" not in st.session_state:
         st.session_state.prod_sel_prev = None
-    if "cant_prod_sel" not in st.session_state:
-        st.session_state.cant_prod_sel = 1
+    if "cant_key_ver" not in st.session_state:
+        st.session_state.cant_key_ver = 0
 
     if es_venta:
         # Cargar inventario
@@ -685,10 +685,18 @@ with st.sidebar:
             
             producto_sel = st.selectbox("Selecciona un producto:", lista_prods, key="sel_prod_sidebar")
             
-            # Si cambió el producto seleccionado en el dropdown, reiniciar cantidad a 1
+            # Si cambió el producto seleccionado en el dropdown, incrementar versión de llave y refrescar
             if st.session_state.prod_sel_prev != producto_sel:
-                st.session_state.cant_prod_sel = 1
                 st.session_state.prod_sel_prev = producto_sel
+                st.session_state.cant_key_ver += 1
+                st.rerun()
+
+            # Obtener cuántas unidades de producto_sel hay actualmente en el carrito
+            cant_actual_en_carr = 0
+            for item_c in st.session_state.carrito_compras:
+                if item_c['producto'] == producto_sel:
+                    cant_actual_en_carr = item_c['cantidad']
+                    break
                 
             producto_idx = df_inv.index[df_inv['producto'] == producto_sel].tolist()[0]
             precio_unitario = float(df_inv.at[producto_idx, 'precio_venta'])
@@ -696,33 +704,40 @@ with st.sidebar:
             
             st.caption(f"Stock disponible: {inv_disponible} unidades | Precio: ${precio_unitario:,.2f}")
             
+            # Widget key dinámico por versión de llave (solución infalible para reiniciar widgets en Streamlit)
+            widget_key = f"cant_input_ver_{st.session_state.cant_key_ver}"
+            
             cantidad_input = st.number_input(
-                "Cantidad a comprar",
-                min_value=1,
-                max_value=max(inv_disponible, 1),
+                "Cantidad a llevar",
+                min_value=0,
+                max_value=max(inv_disponible, 0),
+                value=cant_actual_en_carr,
                 step=1,
-                value=st.session_state.cant_prod_sel,
-                key="cant_input_sidebar"
+                key=widget_key
             )
-            st.session_state.cant_prod_sel = cantidad_input
 
-            # AUTO-AGREGAR O ACTUALIZAR AUTOMÁTICAMENTE EN LA CUENTA
-            encontrado = False
-            for item in st.session_state.carrito_compras:
-                if item['producto'] == producto_sel:
-                    item['cantidad'] = cantidad_input
-                    item['subtotal'] = cantidad_input * precio_unitario
-                    item['producto_idx'] = producto_idx
-                    encontrado = True
-                    break
-            if not encontrado:
-                st.session_state.carrito_compras.append({
-                    "producto": producto_sel,
-                    "producto_idx": producto_idx,
-                    "cantidad": cantidad_input,
-                    "precio_unitario": precio_unitario,
-                    "subtotal": cantidad_input * precio_unitario
-                })
+            # ACTUALIZACIÓN DEL CARRITO SEGÚN LA CANTIDAD ELEGIDA (Si es 0, no se agrega / se quita)
+            if cantidad_input == 0:
+                st.session_state.carrito_compras = [
+                    item for item in st.session_state.carrito_compras if item['producto'] != producto_sel
+                ]
+            else:
+                encontrado = False
+                for item in st.session_state.carrito_compras:
+                    if item['producto'] == producto_sel:
+                        item['cantidad'] = cantidad_input
+                        item['subtotal'] = cantidad_input * precio_unitario
+                        item['producto_idx'] = producto_idx
+                        encontrado = True
+                        break
+                if not encontrado:
+                    st.session_state.carrito_compras.append({
+                        "producto": producto_sel,
+                        "producto_idx": producto_idx,
+                        "cantidad": cantidad_input,
+                        "precio_unitario": precio_unitario,
+                        "subtotal": cantidad_input * precio_unitario
+                    })
 
             # Mostrar resumen de la cuenta
             if len(st.session_state.carrito_compras) > 0:
@@ -746,6 +761,7 @@ with st.sidebar:
                 if indices_a_borrar:
                     for idx_b in sorted(indices_a_borrar, reverse=True):
                         st.session_state.carrito_compras.pop(idx_b)
+                    st.session_state.cant_key_ver += 1
                     st.rerun()
                 
                 st.markdown(f"#### **Total Cuenta: ${total_cuenta:,.2f}**")
@@ -756,11 +772,12 @@ with st.sidebar:
                 if st.button("🗑️ Eliminar Cuenta", use_container_width=True):
                     st.session_state.carrito_compras = []
                     st.session_state.prod_sel_prev = None
+                    st.session_state.cant_key_ver += 1
                     st.rerun()
             else:
                 monto_final = 0.0
                 concepto_final = ""
-                st.caption("La cuenta del cliente está vacía.")
+                st.caption("La cuenta del cliente está vacía (0 productos).")
 
             mostrar_pago = True
         else:
@@ -795,7 +812,7 @@ with st.sidebar:
     btn_guardar = st.button("💾 Cobrar y Generar Ticket", use_container_width=True, type="primary")
     if btn_guardar:
         if es_venta and tipo_venta == "Producto del Inventario (Cuenta)" and len(st.session_state.carrito_compras) == 0:
-            st.error("⚠️ La cuenta está vacía. Selecciona un producto antes de cobrar.")
+            st.error("⚠️ La cuenta está vacía (0 productos). Asigna cantidad a al menos un producto antes de cobrar.")
         else:
             fecha_str = fecha_input.strftime("%Y-%m-%d")
             hora_str = datetime.now().strftime("%H:%M")
@@ -842,6 +859,7 @@ with st.sidebar:
                 }
                 st.session_state.carrito_compras = []
                 st.session_state.prod_sel_prev = None
+                st.session_state.cant_key_ver += 1
                 
             st.success(f"✅ ¡Venta cobrada con éxito! Folio: {folio_str if folio_str else 'N/A'}")
             st.rerun()
