@@ -6,6 +6,14 @@ import os
 import json
 from datetime import datetime, date
 
+# Módulos técnicos, operativos y financieros industriales
+from modulos import (
+    render_inversion_inicial,
+    render_cotizaciones_presupuestos,
+    render_diagrama_flujo,
+    render_balance_energetico
+)
+
 # ==========================================
 # 1. CONFIGURACIÓN DE PÁGINA
 # ==========================================
@@ -1087,12 +1095,13 @@ st.markdown("---")
 # ==========================================
 # 13. PESTAÑAS
 # ==========================================
-tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_prod, tab_guia = st.tabs([
+tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_prod, tab_ind, tab_guia = st.tabs([
     "📢 Diagnóstico y Consejos",
     "🛡️ Riesgo y Ubicación",
     "📊 Gráficas",
     "📜 Historial",
     "📦 Productos y Rentabilidad",
+    "🏭 Ingeniería de Planta & CFE",
     "🎓 Guía Financiera"
 ])
 
@@ -1434,6 +1443,29 @@ with tab_prod:
                 color_continuous_scale=['#f59e0b', '#0ea5e9', '#10b981']
             )
             st.plotly_chart(fig_rank, use_container_width=True)
+
+with tab_ind:
+    st.markdown("### 🏭 Módulo Técnico, Operativo y Financiero Industrial (México)")
+    st.caption("Herramienta paramétrica modular para formulación, evaluación de proyectos e ingeniería de planta.")
+
+    ind_subtab1, ind_subtab2, ind_subtab3, ind_subtab4 = st.tabs([
+        "1️⃣ Inversión Inicial (Ficha Técnica)",
+        "2️⃣ Presupuestos y Cotizaciones",
+        "3️⃣ Diagrama de Flujo y Tiempos",
+        "4️⃣ Balance Energético y Recibo CFE"
+    ])
+
+    with ind_subtab1:
+        render_inversion_inicial()
+
+    with ind_subtab2:
+        render_cotizaciones_presupuestos()
+
+    with ind_subtab3:
+        render_diagrama_flujo()
+
+    with ind_subtab4:
+        render_balance_energetico()
 
 with tab_guia:
     st.markdown("### 🎓 Guía Financiera para no Financieros")

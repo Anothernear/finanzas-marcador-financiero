@@ -1,0 +1,5 @@
+# Package init for industrial engineering modules
+from .inversion_inicial import render_inversion_inicial
+from .cotizaciones_presupuestos import render_cotizaciones_presupuestos
+from .diagrama_flujo import render_diagrama_flujo
+from .balance_energetico import render_balance_energetico
