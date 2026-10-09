@@ -134,7 +134,6 @@ def render_diagrama_flujo():
     st.markdown("##### 📝 1. Tabla Editable de Actividades del Proceso (Modifica directamente aquí)")
     st.caption("Añade, edita o elimina filas para ajustar los pasos. El diagrama ANSI y las métricas se actualizarán instantáneamente.")
 
-    # Data Editor interactivo para modificar el flujo sin escribir código
     opciones_simbologia = [
         "🚀 Inicio / Fin (Cápsula)",
         "⚙️ Operación / Proceso (Rectángulo)",
@@ -207,22 +206,12 @@ def render_diagrama_flujo():
     if not edited_df.empty:
         df_energia = edited_df.copy()
 
-        # Tiempo de operación de la maquinaria por lote (horas)
         df_energia["Tiempo Op. (hrs/lote)"] = (df_energia["Set-up (min)"] + df_energia["Transformación (min)"]) / 60.0
-        
-        # Consumo de potencia efectiva (kW efectivos = kW nominal * factor de carga %)
         df_energia["Potencia Efectiva (kW)"] = df_energia["Potencia (kW)"] * (df_energia["Factor Carga (%)"] / 100.0)
-        
-        # Consumo kWh por lote = Potencia efectiva kW * horas de operación por lote
         df_energia["Consumo kWh / Lote"] = df_energia["Potencia Efectiva (kW)"] * df_energia["Tiempo Op. (hrs/lote)"]
-        
-        # Consumo kWh Diario = kWh por lote * lotes por turno
         df_energia["Consumo kWh / Día"] = df_energia["Consumo kWh / Lote"] * lotes_por_turno
-        
-        # Consumo kWh Mensual = kWh diario * días operativos al mes
         df_energia["Consumo kWh / Mes"] = df_energia["Consumo kWh / Día"] * dias_mes
 
-        # Formateo para la visualización
         df_disp_energia = pd.DataFrame({
             "Paso": df_energia["Paso"],
             "Actividad": df_energia["Actividad / Etapa"],
@@ -241,7 +230,6 @@ def render_diagrama_flujo():
         kwh_total_mes = float(df_energia["Consumo kWh / Mes"].sum())
         kw_demanda_maxima = float(df_energia["Potencia Efectiva (kW)"].sum())
 
-        # Guardar balance energético calculado para el recibo CFE
         st.session_state.kwh_total_mes_calculado = kwh_total_mes
         st.session_state.kw_demanda_maxima_calculada = kw_demanda_maxima
 

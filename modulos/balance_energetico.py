@@ -5,24 +5,16 @@ def render_balance_energetico():
     """
     Módulo de Balance Energético y Costeo Eléctrico con Tarifas Industriales CFE (GDMTO / GDMTH).
     Modela demanda facturable, energía base/intermedio/punta, ajuste por Factor de Potencia (FP) y costo unitario.
-    Infiere datos calculados del motor de diagrama de flujo si están disponibles en session_state.
     """
     st.markdown("#### ⚡ Fase 3: Balance Energético y Costeo Eléctrico (Esquema CFE)")
     st.caption("Cálculo de recibo industrial CFE bajo tarifas GDMTO / GDMTH con penalización/bonificación por Factor de Potencia.")
-
-    # Recuperar consumo o demanda calculados automáticamente por el motor de flujo si existen
-    kwh_sugerido_mes = float(st.session_state.get("kwh_total_mes_calculado", 9720.0))
-    kw_demanda_sugerida = float(st.session_state.get("kw_demanda_maxima_calculada", 45.0))
-
-    if "kwh_total_mes_calculado" in st.session_state:
-        st.success(f"🔗 **Datos vinculados del Motor de Producción:** Demanda instalada = **{kw_demanda_sugerida:.1f} kW** | Consumo calculado = **{kwh_sugerido_mes:,.0f} kWh/mes**")
 
     col_a, col_b = st.columns([1, 1])
     with col_a:
         st.markdown("##### 🔌 Balance de Cargas Eléctricas")
         demanda_contratada_kw = st.number_input(
             "Demanda Contratada / Potencia Total Instalada (kW):",
-            min_value=1.0, value=max(1.0, kw_demanda_sugerida), step=5.0, key="ind_demanda_kw"
+            min_value=1.0, value=45.0, step=5.0, key="ind_demanda_kw"
         )
         factor_carga_pct = st.slider(
             "Factor de Carga / Utilización Promedio (%):",
@@ -66,13 +58,9 @@ def render_balance_energetico():
             precio_kwh_unico = st.number_input("Precio kWh Energía Único ($ MXN):", min_value=0.0, value=1.85, step=0.05, key="ind_p_unico")
 
     # Cálculos energéticos y financieros CFE
-    if "kwh_total_mes_calculado" in st.session_state:
-        consumo_mensual_kwh = kwh_sugerido_mes
-        consumo_diario_kwh = consumo_mensual_kwh / (dias_mes_op if dias_mes_op > 0 else 1)
-    else:
-        potencia_efectiva_kw = demanda_contratada_kw * (factor_carga_pct / 100.0)
-        consumo_diario_kwh = potencia_efectiva_kw * horas_diarias_op
-        consumo_mensual_kwh = consumo_diario_kwh * dias_mes_op
+    potencia_efectiva_kw = demanda_contratada_kw * (factor_carga_pct / 100.0)
+    consumo_diario_kwh = potencia_efectiva_kw * horas_diarias_op
+    consumo_mensual_kwh = consumo_diario_kwh * dias_mes_op
 
     costo_capacidad_total = demanda_contratada_kw * costo_kw_capacidad
 
