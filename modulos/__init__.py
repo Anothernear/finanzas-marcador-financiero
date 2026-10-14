@@ -3,7 +3,6 @@ from .inversion_inicial import render_inversion_inicial
 from .cotizaciones_presupuestos import render_cotizaciones_presupuestos
 from .diagrama_flujo import render_diagrama_flujo
 from .balance_energetico import render_balance_energetico
-
 # Módulos de Autenticación, Biometría y Personal
 from .auth import (
     cargar_usuarios,
@@ -14,3 +13,11 @@ from .auth import (
 )
 from .biometrico import modal_simulador_huella
 from .personal import render_administracion_personal, render_dashboard_empleado
+
+# Módulo de Impresión de Tickets
+from .ticket_printer import (
+    render_ticket_component,
+    mostrar_dialogo_ticket,
+    generar_html_ticket
+)
+

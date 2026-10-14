@@ -6,6 +6,7 @@ import json
 from datetime import datetime, date
 from modulos.auth import cargar_usuarios, guardar_usuarios, hash_password, render_user_badge_sidebar
 from modulos.biometrico import modal_simulador_huella
+from modulos.ticket_printer import mostrar_dialogo_ticket
 
 def render_administracion_personal(df_db: pd.DataFrame):
     """
@@ -205,8 +206,9 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
     - IZQUIERDA (Sidebar): Badge de cajero, corte de turno, métricas de jornada y último ticket emitido.
     - CENTRO (Pantalla Principal): Terminal Punto de Venta (POS) para cobrar productos del inventario,
       administrar la cuenta del cliente en tiempo real, solicitar autorización biométrica si se altera fecha
-      y buscador rápido de precios y existencias.
     """
+    if not usuario_actual:
+        usuario_actual = {}
     hoy_str = date.today().strftime("%Y-%m-%d")
     hoy_fecha = date.today()
     mi_usuario = usuario_actual.get('username', '')
@@ -289,6 +291,8 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+                if st.button("🖨️ Imprimir Ticket (150mm)", use_container_width=True, key="btn_print_tk_cajero"):
+                    mostrar_dialogo_ticket(ultimo_tk, st.session_state.get('config_negocio', {}))
                 if st.button("🔄 Listo / Siguiente Venta", use_container_width=True, key="btn_sig_tk_sb"):
                     st.session_state.ultimo_ticket = None
                     st.rerun()
