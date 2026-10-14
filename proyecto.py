@@ -965,7 +965,7 @@ with st.sidebar:
 
             if es_venta:
                 # Guardar último ticket generado para mostrar e imprimir en pantalla
-                items_guardar = list(st.session_state.carrito_compras) if (tipo_venta == "Producto del Inventario (Cuenta)" and st.session_state.carrito_compras) else []
+                items_guardar = list(st.session_state.carrito_compras) if st.session_state.carrito_compras else []
                 st.session_state.ultimo_ticket = {
                     "folio": folio_str,
                     "fecha": fecha_str,
@@ -978,8 +978,9 @@ with st.sidebar:
                 st.session_state.carrito_compras = []
                 st.session_state.prod_sel_prev = None
                 st.session_state.cant_key_ver += 1
-                
-            st.success(f"✅ ¡{'Venta cobrada con éxito! Folio: ' + folio_str if es_venta else 'Movimiento registrado con éxito!'} ")
+                st.success(f"✅ ¡Venta cobrada con éxito! Folio: {folio_str}")
+            else:
+                st.success("✅ ¡Movimiento registrado con éxito!")
             st.rerun()
 
         
