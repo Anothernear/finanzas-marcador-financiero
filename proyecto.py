@@ -6,12 +6,18 @@ import os
 import json
 from datetime import datetime, date
 
-# Importación de Módulos Industriales y Técnicos
+# Importación de Módulos Industriales, Técnicos y de Autenticación
 from modulos import (
     render_inversion_inicial,
     render_cotizaciones_presupuestos,
     render_diagrama_flujo,
-    render_balance_energetico
+    render_balance_energetico,
+    cargar_usuarios,
+    render_pantalla_login,
+    render_user_badge_sidebar,
+    modal_simulador_huella,
+    render_administracion_personal,
+    render_dashboard_empleado
 )
 
 # ==========================================
@@ -105,6 +111,12 @@ def cargar_y_validar_db():
         df['folio'] = ""
     if 'productos_detalle' not in df.columns:
         df['productos_detalle'] = ""
+    if 'usuario' not in df.columns:
+        df['usuario'] = "gerente"
+    if 'autorizado_por' not in df.columns:
+        df['autorizado_por'] = ""
+    if 'motivo_autorizacion' not in df.columns:
+        df['motivo_autorizacion'] = ""
     df.to_csv(CSV_FILE, index=False)
     return df
 
@@ -257,6 +269,12 @@ def mostrar_modal_ganancia_neta(m, r):
 # ==========================================
 # 3. ESTADO DE SESIÓN
 # ==========================================
+if 'usuario_actual' not in st.session_state:
+    st.session_state.usuario_actual = None
+
+if 'auth_gerente_cambio_fecha' not in st.session_state:
+    st.session_state.auth_gerente_cambio_fecha = None
+
 if 'onboarding_complete' not in st.session_state:
     st.session_state.onboarding_complete = False
 
@@ -520,6 +538,17 @@ def generar_diagnostico(m):
     return diagnostico
 
 # ==========================================
+# 5. CONTROL DE ACCESO / LOGIN OBLIGATORIO
+# ==========================================
+usuario_actual = st.session_state.get('usuario_actual')
+if not usuario_actual:
+    render_pantalla_login()
+    st.stop()
+
+es_gerente = (usuario_actual.get('rol') == 'gerente') if usuario_actual else False
+es_empleado = not es_gerente
+
+# ==========================================
 # 6. ONBOARDING — SIN st.form PARA REACTIVIDAD
 # ==========================================
 def on_change_zona():
@@ -529,9 +558,13 @@ def on_change_zona():
     st.session_state.slider_riesgo_merma = float(datos.get("riesgo_merma_sugerida", 4.0))
 
 if not st.session_state.onboarding_complete:
-    st.title("⚡ Configuración del Negocio & Análisis de Riesgo")
-    st.caption("Personaliza los datos de tu negocio y calibra los riesgos según el lugar donde operas.")
-    st.markdown("---")
+    if es_empleado:
+        # Los cajeros/empleados acceden directamente a ventas con la configuración activa
+        st.session_state.onboarding_complete = True
+    else:
+        st.title("⚡ Configuración del Negocio & Análisis de Riesgo")
+        st.caption("Personaliza los datos de tu negocio y calibra los riesgos según el lugar donde operas.")
+        st.markdown("---")
 
     col_on1, col_on2 = st.columns(2)
 
@@ -616,7 +649,16 @@ r = calculos["riesgos"]
 n = calculos["negocio"]
 d = calculos["diario"]
 mp = calculos["metodos_pago"]
+# ==========================================
+# VISTA JERARQUIZADA: MODO EMPLEADO / CAJERO
+# ==========================================
+if es_empleado:
+    render_dashboard_empleado(df_db, usuario_actual, m, d, archivo_productos="productos_template.csv")
+    st.stop()
 
+# ==========================================
+# MODO GERENTE (ACCESO TOTAL Y ADMINISTRACIÓN)
+# ==========================================
 # Encabezado
 col_head1, col_head2 = st.columns([3, 1])
 with col_head1:
@@ -650,17 +692,18 @@ st.markdown("---")
 # 8. BARRA LATERAL (PUNTO DE VENTA AUTOMÁTICO)
 # ==========================================
 with st.sidebar:
+    render_user_badge_sidebar()
+    st.markdown("---")
     st.markdown("### 📥 Registrar Dinero")
     st.caption("Apunta lo que entra y lo que sale:")
 
-    tipo_opcion = st.selectbox(
-        "¿Qué movimiento vas a ingresar?",
-        [
-            "🟢 Venta (Dinero que cobraste)",
-            "🟠 Compra de Mercancía / Insumos (Costo Variable)",
-            "🔴 Gasto del Local / Negocio (Costo Fijo)"
-        ]
-    )
+    opciones_mov = [
+        "🟢 Venta (Dinero que cobraste)",
+        "🟠 Compra de Mercancía / Insumos (Costo Variable)",
+        "🔴 Gasto del Local / Negocio (Costo Fijo)"
+    ]
+
+    tipo_opcion = st.selectbox("¿Qué movimiento vas a ingresar?", opciones_mov)
     
     es_venta = "Venta" in tipo_opcion
     es_costo_var = "Mercancía" in tipo_opcion
@@ -686,9 +729,7 @@ with st.sidebar:
             if 'inventario' not in df_inv.columns:
                 df_inv['inventario'] = 50
         
-        tipo_venta = st.radio("Tipo de venta:", ["General (Libre)", "Producto del Inventario (Cuenta)"], horizontal=True)
-        
-        if tipo_venta == "Producto del Inventario (Cuenta)" and df_inv is not None and not df_inv.empty:
+        if df_inv is not None and not df_inv.empty:
             lista_prods = df_inv['producto'].tolist()
             
             producto_sel = st.selectbox("Selecciona un producto:", lista_prods, key="sel_prod_sidebar")
@@ -789,9 +830,8 @@ with st.sidebar:
 
             mostrar_pago = True
         else:
-            monto_final = st.number_input("Monto en dinero ($)", min_value=1.0, step=50.0, value=150.0)
-            concepto_final = st.text_input("¿En qué concepto o motivo?", value="Ventas del día", help="Ej: Ventas del día, pedido especial, etc.")
-            mostrar_pago = True
+            st.warning("⚠️ No hay productos disponibles en el catálogo. Agrega productos en la pestaña de Inventario.")
+            mostrar_pago = False
     else:
         monto_final = st.number_input("Monto en dinero ($)", min_value=1.0, step=50.0, value=150.0)
         if es_costo_var:
@@ -805,11 +845,17 @@ with st.sidebar:
         mostrar_pago = False
 
     hoy_fecha = date.today()
+    fecha_a_usar = hoy_fecha
+    es_fecha_modificada = False
+    autorizador_gerente = ""
+    motivo_justif = ""
+
+    # Rol Gerente: Control libre de fecha
     fecha_input = st.date_input(
         "📅 Fecha del movimiento:",
         value=hoy_fecha,
         max_value=hoy_fecha,
-        help="No se permiten fechas futuras. Puedes registrar movimientos de días anteriores."
+        help="Como Gerente puedes ingresar movimientos en fechas pasadas libremente."
     )
 
     if mostrar_pago:
@@ -817,9 +863,9 @@ with st.sidebar:
     else:
         metodo_pago_input = ""
 
-    btn_guardar = st.button("💾 Cobrar y Generar Ticket", use_container_width=True, type="primary")
+    btn_guardar = st.button("💾 Cobrar y Generar Ticket" if es_venta else "💾 Guardar Movimiento", use_container_width=True, type="primary")
     if btn_guardar:
-        if es_venta and tipo_venta == "Producto del Inventario (Cuenta)" and len(st.session_state.carrito_compras) == 0:
+        if es_venta and len(st.session_state.carrito_compras) == 0:
             st.error("⚠️ La cuenta está vacía (0 productos). Asigna cantidad a al menos un producto antes de cobrar.")
         else:
             fecha_str = fecha_input.strftime("%Y-%m-%d")
@@ -827,7 +873,7 @@ with st.sidebar:
             folio_str = generar_folio_ticket(df_db) if es_venta else ""
 
             detalle_json = ""
-            if es_venta and tipo_venta == "Producto del Inventario (Cuenta)" and st.session_state.carrito_compras:
+            if es_venta and st.session_state.carrito_compras:
                 detalle_json = json.dumps([
                     {"producto": it['producto'], "cantidad": it['cantidad'], "precio_unitario": it['precio_unitario'], "subtotal": it['subtotal']}
                     for it in st.session_state.carrito_compras
@@ -842,13 +888,19 @@ with st.sidebar:
                 "es_costo_directo": es_costo_var,
                 "metodo_pago": metodo_pago_input if es_venta else "",
                 "folio": folio_str,
-                "productos_detalle": detalle_json
+                "productos_detalle": detalle_json,
+                "usuario": usuario_actual.get('username', 'gerente') if usuario_actual else 'gerente',
+                "autorizado_por": autorizador_gerente if es_fecha_modificada else "",
+                "motivo_autorizacion": motivo_justif if es_fecha_modificada else ""
             }
             df_actualizado = pd.concat([df_db, pd.DataFrame([nuevo_reg])], ignore_index=True)
             df_actualizado.to_csv(CSV_FILE, index=False)
+
+            if es_fecha_modificada:
+                st.session_state.auth_gerente_cambio_fecha = None
             
             # Descontar inventario de todos los productos en la cuenta
-            if es_venta and tipo_venta == "Producto del Inventario (Cuenta)" and df_inv is not None:
+            if es_venta and df_inv is not None:
                 for item in st.session_state.carrito_compras:
                     p_idx = item['producto_idx']
                     cant = item['cantidad']
@@ -869,8 +921,9 @@ with st.sidebar:
                 st.session_state.prod_sel_prev = None
                 st.session_state.cant_key_ver += 1
                 
-            st.success(f"✅ ¡Venta cobrada con éxito! Folio: {folio_str if folio_str else 'N/A'}")
+            st.success(f"✅ ¡{'Venta cobrada con éxito! Folio: ' + folio_str if es_venta else 'Movimiento registrado con éxito!'} ")
             st.rerun()
+
         
     st.markdown("---")
     
@@ -894,28 +947,29 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("### ⚙️ Opciones del Negocio")
+    if es_gerente:
+        st.markdown("---")
+        st.markdown("### ⚙️ Opciones del Negocio")
 
-    if st.button("🔄 Cargar Datos Demo", use_container_width=True):
-        restaurar_datos_demo()
-        st.success("Datos demo restaurados.")
-        st.rerun()
+        if st.button("🔄 Cargar Datos Demo", use_container_width=True):
+            restaurar_datos_demo()
+            st.success("Datos demo restaurados.")
+            st.rerun()
 
-    if st.button("🗑️ Vaciar Registros (Empezar en 0)", use_container_width=True):
-        df_vacio = pd.DataFrame(columns=['fecha', 'hora', 'tipo', 'monto', 'concepto', 'es_costo_directo', 'metodo_pago', 'folio', 'productos_detalle'])
-        df_vacio.to_csv(CSV_FILE, index=False)
-        st.success("Base de datos limpia.")
-        st.rerun()
+        if st.button("🗑️ Vaciar Registros (Empezar en 0)", use_container_width=True):
+            df_vacio = pd.DataFrame(columns=['fecha', 'hora', 'tipo', 'monto', 'concepto', 'es_costo_directo', 'metodo_pago', 'folio', 'productos_detalle', 'usuario', 'autorizado_por', 'motivo_autorizacion'])
+            df_vacio.to_csv(CSV_FILE, index=False)
+            st.success("Base de datos limpia.")
+            st.rerun()
 
-    if st.button("✏️ Editar Parámetros y Riesgo de Zona", use_container_width=True):
-        st.session_state.onboarding_complete = False
-        st.rerun()
+        if st.button("✏️ Editar Parámetros y Riesgo de Zona", use_container_width=True):
+            st.session_state.onboarding_complete = False
+            st.rerun()
 
 # ==========================================
 # 9. SECCIÓN 1: RESUMEN DE VENTAS CON BOTONES INTERACTIVOS
 # ==========================================
-st.markdown("### ☀️ Resumen de Ventas")
+st.markdown("### ☀️ Resumen de Ventas (Vista Gerencial)")
 
 col_v1, col_v2, col_v3, col_v4 = st.columns(4)
 
@@ -1095,13 +1149,14 @@ st.markdown("---")
 # ==========================================
 # 13. PESTAÑAS
 # ==========================================
-tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_prod, tab_ind, tab_guia = st.tabs([
+tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_prod, tab_ind, tab_personal, tab_guia = st.tabs([
     "📢 Diagnóstico y Consejos",
     "🛡️ Riesgo y Ubicación",
     "📊 Gráficas",
     "📜 Historial",
     "📦 Productos y Rentabilidad",
     "🏭 Ingeniería de Planta & CFE",
+    "👥 Personal & Auditoría",
     "🎓 Guía Financiera"
 ])
 
@@ -1466,6 +1521,9 @@ with tab_ind:
 
     with ind_subtab4:
         render_balance_energetico()
+
+with tab_personal:
+    render_administracion_personal(df_db)
 
 with tab_guia:
     st.markdown("### 🎓 Guía Financiera para no Financieros")

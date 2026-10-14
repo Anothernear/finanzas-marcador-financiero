@@ -1,0 +1,4 @@
+username,nombre,password_hash,rol,pin_biometrico,activo,fecha_registro
+gerente,Gerente General,240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9,gerente,1234,True,2026-10-14 10:37
+empleado1,Juan Pérez (Cajero Turno A),03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4,empleado,0000,True,2026-10-14 10:37
+empleado2,María López (Cajera Turno B),03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4,empleado,0000,True,2026-10-14 10:37
