@@ -18,6 +18,7 @@ from modulos import (
     modal_simulador_huella,
     render_administracion_personal,
     render_dashboard_empleado,
+    actualizar_metodo_pago_ticket,
     render_ticket_component,
     mostrar_dialogo_ticket,
     generar_html_ticket
@@ -713,10 +714,26 @@ with col_head2:
 if st.session_state.get("ultimo_ticket"):
     tk = st.session_state.ultimo_ticket
     with st.container(border=True):
-        col_tk_head, col_tk_close = st.columns([3, 1])
+        col_tk_head, col_tk_mod, col_tk_close = st.columns([2.5, 1.5, 1])
         with col_tk_head:
             st.markdown(f"### 🧾 Ticket de Venta Listo para Imprimir — Folio: `{tk['folio']}`")
-            st.caption("Formato térmico optimizado (150mm). Haz clic en **Imprimir Ticket** para enviar a impresora térmica o guardar como PDF.")
+            st.caption(f"Formato térmico (150mm) | Total: **${tk.get('monto', 0.0):,.2f}** | Método Registrado: **{tk.get('metodo_pago')}**")
+        with col_tk_mod:
+            with st.popover("💳 Cambiar Método de Pago", use_container_width=True):
+                st.markdown("##### ✏️ Rectificar Método de Pago")
+                st.caption("¿El cliente cambió la forma de pago? Actualízala aquí:")
+                lista_mp = ["💵 Efectivo", "🏦 Transferencia", "💳 Tarjeta Débito", "💳 Tarjeta Crédito"]
+                mp_act = tk.get('metodo_pago', '💵 Efectivo')
+                idx_mp = lista_mp.index(mp_act) if mp_act in lista_mp else 0
+                nuevo_mp_ger = st.selectbox("Forma de pago correcta:", lista_mp, index=idx_mp, key="pop_mp_gerente_last_tk")
+                if st.button("💾 Guardar y Actualizar Ticket", type="primary", use_container_width=True, key="btn_upd_mp_gerente_last_tk"):
+                    if nuevo_mp_ger != mp_act:
+                        actualizar_metodo_pago_ticket(tk.get('folio'), nuevo_mp_ger)
+                        st.session_state.ultimo_ticket['metodo_pago'] = nuevo_mp_ger
+                        st.success(f"¡Ticket {tk.get('folio')} actualizado a {nuevo_mp_ger}!")
+                        st.rerun()
+                    else:
+                        st.info("El ticket ya tiene asignado ese método.")
         with col_tk_close:
             if st.button("❌ Cerrar Ticket", use_container_width=True):
                 del st.session_state.ultimo_ticket
@@ -1539,6 +1556,19 @@ with tab_ticket:
                         st.write(f"- {it_r.get('cantidad', 1)}x {it_r.get('producto')} (${it_r.get('subtotal', 0.0):,.2f})")
                 else:
                     st.write(f"**Concepto:** {tk_reimprimir['concepto']}")
+
+                with st.expander("💳 Modificar Método de Pago de este Ticket", expanded=False):
+                    lista_mp = ["💵 Efectivo", "🏦 Transferencia", "💳 Tarjeta Débito", "💳 Tarjeta Crédito"]
+                    mp_act_hist = tk_reimprimir['metodo_pago']
+                    idx_mp_hist = lista_mp.index(mp_act_hist) if mp_act_hist in lista_mp else 0
+                    nuevo_mp_hist = st.selectbox("Forma de pago correcta:", lista_mp, index=idx_mp_hist, key=f"sel_reimp_mp_{tk_reimprimir['folio']}")
+                    if st.button("💾 Actualizar Método en Base de Datos", type="primary", use_container_width=True, key=f"btn_reimp_mp_{tk_reimprimir['folio']}"):
+                        if nuevo_mp_hist != mp_act_hist:
+                            actualizar_metodo_pago_ticket(tk_reimprimir['folio'], nuevo_mp_hist)
+                            st.success(f"¡Ticket {tk_reimprimir['folio']} actualizado a {nuevo_mp_hist}!")
+                            st.rerun()
+                        else:
+                            st.info("El ticket ya tiene asignado ese método.")
 
             with col_reimp2:
                 render_ticket_component(tk_reimprimir, config, height=700)

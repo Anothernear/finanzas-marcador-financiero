@@ -12,7 +12,11 @@ from .auth import (
     render_user_badge_sidebar
 )
 from .biometrico import modal_simulador_huella
-from .personal import render_administracion_personal, render_dashboard_empleado
+from .personal import (
+    render_administracion_personal,
+    render_dashboard_empleado,
+    actualizar_metodo_pago_ticket
+)
 
 # Módulo de Impresión de Tickets
 from .ticket_printer import (

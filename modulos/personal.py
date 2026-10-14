@@ -8,6 +8,36 @@ from modulos.auth import cargar_usuarios, guardar_usuarios, hash_password, rende
 from modulos.biometrico import modal_simulador_huella
 from modulos.ticket_printer import mostrar_dialogo_ticket
 
+def actualizar_metodo_pago_ticket(folio: str, nuevo_metodo: str, csv_file: str = "hermes_financial_db.csv") -> bool:
+    """
+    Actualiza el método de pago de una transacción/ticket en la base de datos CSV
+    y en el estado de sesión activo del ticket.
+    """
+    if not os.path.exists(csv_file):
+        return False
+    try:
+        df = pd.read_csv(csv_file)
+        if 'folio' not in df.columns or 'metodo_pago' not in df.columns:
+            return False
+        
+        folio_limpio = str(folio).strip()
+        mask = (df['folio'].astype(str).str.strip() == folio_limpio) & (df['tipo'] == 'venta')
+        if not mask.any():
+            return False
+            
+        df.loc[mask, 'metodo_pago'] = nuevo_metodo
+        df.to_csv(csv_file, index=False)
+        
+        # Sincronizar el ticket activo en sesión si corresponde al mismo folio
+        if 'ultimo_ticket' in st.session_state and st.session_state.ultimo_ticket:
+            if str(st.session_state.ultimo_ticket.get('folio', '')).strip() == folio_limpio:
+                st.session_state.ultimo_ticket['metodo_pago'] = nuevo_metodo
+                
+        return True
+    except Exception as e:
+        print(f"Error al actualizar método de pago en ticket: {e}")
+        return False
+
 def render_administracion_personal(df_db: pd.DataFrame):
     """
     Panel de Gerencia: Administración de Personal, Auditoría de Ventas por Cajero y Jornada,
@@ -174,6 +204,27 @@ def render_administracion_personal(df_db: pd.DataFrame):
             df_tabla_v = df_filtrado[cols_mostrar].copy()
             df_tabla_v.columns = ['Fecha', 'Hora', 'Folio Ticket', 'Cajero', 'Concepto / Detalle', 'Monto ($)', 'Método Cobro']
             st.dataframe(df_tabla_v.sort_values(by=['Fecha', 'Hora'], ascending=False), use_container_width=True)
+
+            with st.expander("💳 Rectificar Método de Pago de una Venta Registrada", expanded=False):
+                lista_fol_adm = [f for f in df_filtrado['folio'].dropna().unique().tolist() if str(f).strip() != ""]
+                if lista_fol_adm:
+                    col_ad1, col_ad2, col_ad3 = st.columns([1.5, 1.5, 1])
+                    with col_ad1:
+                        fol_adm_sel = st.selectbox("Selecciona Folio a Modificar:", lista_fol_adm, key="sel_fol_admin_mp")
+                    with col_ad2:
+                        mp_adm_actual = df_filtrado[df_filtrado['folio'] == fol_adm_sel]['metodo_pago'].values[0] if not df_filtrado[df_filtrado['folio'] == fol_adm_sel].empty else "💵 Efectivo"
+                        lista_mp = ["💵 Efectivo", "🏦 Transferencia", "💳 Tarjeta Débito", "💳 Tarjeta Crédito"]
+                        idx_adm = lista_mp.index(mp_adm_actual) if mp_adm_actual in lista_mp else 0
+                        nvo_mp_adm = st.selectbox("Nuevo Método de Cobro:", lista_mp, index=idx_adm, key="sel_nvo_mp_admin")
+                    with col_ad3:
+                        st.write("")
+                        if st.button("💾 Guardar Cambio", use_container_width=True, key="btn_save_mp_admin"):
+                            if nvo_mp_adm != mp_adm_actual:
+                                actualizar_metodo_pago_ticket(fol_adm_sel, nvo_mp_adm)
+                                st.success(f"¡Venta {fol_adm_sel} actualizada a {nvo_mp_adm}!")
+                                st.rerun()
+                            else:
+                                st.info("Ya tiene ese método de cobro.")
         else:
             st.info("No se encontraron ventas para los filtros seleccionados.")
 
@@ -263,6 +314,25 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
                     use_container_width=True,
                     height=180
                 )
+                lista_folios_turno = df_mis_ventas_hoy['folio'].dropna().unique().tolist()
+                if lista_folios_turno:
+                    st.markdown("---")
+                    st.caption("✏️ **Rectificar método de un cobro anterior:**")
+                    col_rf1, col_rf2 = st.columns([1.2, 1.8])
+                    with col_rf1:
+                        folio_corte_sel = st.selectbox("Ticket:", lista_folios_turno, key="sel_folio_corte_upd")
+                    with col_rf2:
+                        metodo_actual_corte = df_mis_ventas_hoy[df_mis_ventas_hoy['folio'] == folio_corte_sel]['metodo_pago'].values[0] if not df_mis_ventas_hoy[df_mis_ventas_hoy['folio'] == folio_corte_sel].empty else "💵 Efectivo"
+                        lista_mp = ["💵 Efectivo", "🏦 Transferencia", "💳 Tarjeta Débito", "💳 Tarjeta Crédito"]
+                        idx_corte = lista_mp.index(metodo_actual_corte) if metodo_actual_corte in lista_mp else 0
+                        nuevo_mp_corte = st.selectbox("Nuevo método:", lista_mp, index=idx_corte, key="sel_mp_corte_upd")
+                    if st.button("💾 Actualizar Registro", use_container_width=True, key="btn_act_mp_corte_upd"):
+                        if nuevo_mp_corte != metodo_actual_corte:
+                            actualizar_metodo_pago_ticket(folio_corte_sel, nuevo_mp_corte)
+                            st.success(f"¡Ticket {folio_corte_sel} actualizado a {nuevo_mp_corte}!")
+                            st.rerun()
+                        else:
+                            st.info("Ya tiene ese método de cobro.")
         else:
             st.info("Sin cobros registrados en tu turno aún.")
 
@@ -291,6 +361,22 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+                with st.expander("💳 Cambiar Método de Pago", expanded=False):
+                    st.caption("¿El cliente decidió cambiar su forma de pago? Modifícalo aquí:")
+                    lista_mp = ["💵 Efectivo", "🏦 Transferencia", "💳 Tarjeta Débito", "💳 Tarjeta Crédito"]
+                    mp_actual = ultimo_tk.get('metodo_pago', '💵 Efectivo')
+                    idx_mp = lista_mp.index(mp_actual) if mp_actual in lista_mp else 0
+                    nuevo_mp_sb = st.selectbox("Forma de pago correcta:", lista_mp, index=idx_mp, key=f"sb_upd_mp_{ultimo_tk.get('folio')}")
+                    if st.button("💾 Actualizar Ticket", use_container_width=True, key=f"btn_sb_upd_mp_{ultimo_tk.get('folio')}"):
+                        if nuevo_mp_sb != mp_actual:
+                            actualizar_metodo_pago_ticket(ultimo_tk.get('folio'), nuevo_mp_sb)
+                            st.session_state.ultimo_ticket['metodo_pago'] = nuevo_mp_sb
+                            st.success(f"¡Ticket {ultimo_tk.get('folio')} actualizado a {nuevo_mp_sb}!")
+                            st.rerun()
+                        else:
+                            st.info("El ticket ya tiene asignado ese método.")
+
                 if st.button("🖨️ Imprimir Ticket (150mm)", use_container_width=True, key="btn_print_tk_cajero"):
                     mostrar_dialogo_ticket(ultimo_tk, st.session_state.get('config_negocio', {}))
                 if st.button("🔄 Listo / Siguiente Venta", use_container_width=True, key="btn_sig_tk_sb"):
@@ -314,6 +400,41 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
         """, unsafe_allow_html=True)
 
     st.markdown("---")
+
+    # Banner destacado cuando se acaba de cobrar un ticket con opción de cambio inmediato de método de pago
+    if ultimo_tk:
+        with st.container(border=True):
+            col_nt1, col_nt2, col_nt3 = st.columns([2.5, 1.5, 1])
+            with col_nt1:
+                st.markdown(f"""
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 2.2rem;">🧾</span>
+                    <div>
+                        <strong style="font-size: 1.05rem; color: #0f172a;">Ticket Cobrado: <code>{ultimo_tk.get('folio')}</code></strong><br>
+                        <span style="font-size: 0.9rem; color: #475569;">Total: <b>${ultimo_tk.get('monto', 0.0):,.2f}</b> | Método Registrado: <b style="color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 4px;">{ultimo_tk.get('metodo_pago')}</b></span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col_nt2:
+                with st.popover("💳 Cambiar Método de Pago", use_container_width=True):
+                    st.markdown("##### ✏️ Rectificar Método de Pago")
+                    st.caption("¿El cliente decidió cambiar su forma de pago? Actualízala aquí:")
+                    lista_mp = ["💵 Efectivo", "🏦 Transferencia", "💳 Tarjeta Débito", "💳 Tarjeta Crédito"]
+                    mp_act = ultimo_tk.get('metodo_pago', '💵 Efectivo')
+                    idx_mp = lista_mp.index(mp_act) if mp_act in lista_mp else 0
+                    nuevo_mp_center = st.selectbox("Forma de pago correcta:", lista_mp, index=idx_mp, key=f"cnt_sel_mp_{ultimo_tk.get('folio')}")
+                    if st.button("💾 Guardar y Actualizar Ticket", type="primary", use_container_width=True, key=f"btn_cnt_upd_mp_{ultimo_tk.get('folio')}"):
+                        if nuevo_mp_center != mp_act:
+                            actualizar_metodo_pago_ticket(ultimo_tk.get('folio'), nuevo_mp_center)
+                            st.session_state.ultimo_ticket['metodo_pago'] = nuevo_mp_center
+                            st.success(f"✅ ¡Ticket {ultimo_tk.get('folio')} actualizado a {nuevo_mp_center}!")
+                            st.rerun()
+                        else:
+                            st.info("El ticket ya tiene ese método de pago.")
+            with col_nt3:
+                if st.button("🖨️ Imprimir Ticket", use_container_width=True, key="btn_center_print_pos_tk"):
+                    mostrar_dialogo_ticket(ultimo_tk, st.session_state.get('config_negocio', {}))
+
 
     # Inicializar estado de compras y widget versioning
     if "carrito_compras" not in st.session_state:
