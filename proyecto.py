@@ -11,7 +11,10 @@ from modulos import (
     render_inversion_inicial,
     render_cotizaciones_presupuestos,
     render_diagrama_flujo,
-    render_balance_energetico
+    render_balance_energetico,
+    render_ticket_component,
+    mostrar_dialogo_ticket,
+    generar_html_ticket
 )
 
 # ==========================================
@@ -262,7 +265,7 @@ if 'onboarding_complete' not in st.session_state:
 
 if 'config_negocio' not in st.session_state:
     st.session_state.config_negocio = {
-        "nombre": "Abarrotes El Güero",
+        "nombre": "Abarrotes y Panadería El Güero",
         "giro": "Abarrotes / Tiendita",
         "caja_disponible": 10000.0,
         "inversion_inicial": 25000.0,
@@ -270,7 +273,15 @@ if 'config_negocio' not in st.session_state:
         "ubicacion_estado": "Estado de México / CDMX",
         "tipo_zona": "Zona Urbana Comercial / Afluencia Alta",
         "riesgo_merma_pct": 4.0,
-        "riesgo_seguridad_pct": 3.5
+        "riesgo_seguridad_pct": 3.5,
+        "rfc": "XAXX010101000",
+        "icono": "🥖",
+        "direccion": "Av. Universidad #15, Chapingo / Texcoco, Edo. Méx.",
+        "tasa_iva": 16.0,
+        "incluye_iva": True,
+        "notas_ticket": "¡Gracias por su preferencia! Facturación en línea disponible las 24 hrs.",
+        "url_facturacion": "https://facturacion.sat.gob.mx/portal",
+        "telefono": "595-123-4567"
     }
 
 if 'slider_riesgo_seg' not in st.session_state:
@@ -586,6 +597,28 @@ if not st.session_state.onboarding_complete:
             label_visibility="collapsed"
         )
 
+    st.markdown("---")
+    st.markdown("#### 🧾 3. Parámetros del Ticket de Venta Térmico (150mm / TPV)")
+    st.caption("Configura los datos fiscales, comerciales y de corte que aparecerán en todos tus tickets de venta.")
+
+    col_tk_cfg1, col_tk_cfg2, col_tk_cfg3 = st.columns(3)
+    cfg_exist = st.session_state.config_negocio
+
+    with col_tk_cfg1:
+        rfc_input = st.text_input("📄 RFC de la Empresa:", value=cfg_exist.get("rfc", "XAXX010101000"))
+        icono_input = st.text_input("🎨 Ícono / Emoji del Negocio:", value=cfg_exist.get("icono", "🥖"), help="Emoji o ícono que encabeza el ticket (ej: 🥖, 🛒, 🏪, 🍔)")
+        telefono_input = st.text_input("📞 Teléfono / Contacto:", value=cfg_exist.get("telefono", "595-123-4567"))
+
+    with col_tk_cfg2:
+        direccion_input = st.text_area("📍 Dirección de la Empresa:", value=cfg_exist.get("direccion", "Av. Universidad #15, Chapingo / Texcoco, Edo. Méx."), height=105)
+
+    with col_tk_cfg3:
+        tasa_iva_input = st.number_input("🏛️ Tasa de IVA (%):", min_value=0.0, max_value=30.0, value=float(cfg_exist.get("tasa_iva", 16.0)), step=1.0)
+        incluye_iva_input = st.checkbox("¿Precios incluyen IVA?", value=cfg_exist.get("incluye_iva", True), help="Desglosa el subtotal y el IVA en el ticket térmico.")
+        url_fac_input = st.text_input("🌐 URL Portal Facturación (para QR):", value=cfg_exist.get("url_facturacion", "https://facturacion.sat.gob.mx/portal"))
+
+    notas_ticket_input = st.text_area("💬 Notas al pie del ticket (Agradecimiento / Política):", value=cfg_exist.get("notas_ticket", "¡Gracias por su preferencia! Facturación en línea disponible las 24 hrs."), height=68)
+
     st.markdown("")
     if st.button("🚀 Guardar y Ver mi Marcador Financiero", use_container_width=True, type="primary"):
         st.session_state.config_negocio = {
@@ -597,7 +630,15 @@ if not st.session_state.onboarding_complete:
             "ubicacion_estado": ubicacion_estado,
             "tipo_zona": tipo_zona,
             "riesgo_seguridad_pct": float(riesgo_seguridad_val),
-            "riesgo_merma_pct": float(riesgo_merma_val)
+            "riesgo_merma_pct": float(riesgo_merma_val),
+            "rfc": rfc_input.strip() if rfc_input.strip() else "XAXX010101000",
+            "icono": icono_input.strip() if icono_input.strip() else "🥖",
+            "direccion": direccion_input.strip() if direccion_input.strip() else "Dirección no especificada",
+            "tasa_iva": float(tasa_iva_input),
+            "incluye_iva": bool(incluye_iva_input),
+            "notas_ticket": notas_ticket_input.strip() if notas_ticket_input.strip() else "¡Gracias por su compra!",
+            "url_facturacion": url_fac_input.strip() if url_fac_input.strip() else "https://facturacion.sat.gob.mx/portal",
+            "telefono": telefono_input.strip()
         }
         st.session_state.onboarding_complete = True
         st.rerun()
@@ -630,19 +671,17 @@ with col_head2:
 if st.session_state.get("ultimo_ticket"):
     tk = st.session_state.ultimo_ticket
     with st.container(border=True):
-        col_tk1, col_tk2 = st.columns([3, 1])
-        with col_tk1:
-            st.markdown(f"### 🧾 Ticket de Venta Generado — Folio: `{tk['folio']}`")
-            st.caption(f"📅 **Fecha:** {tk['fecha']} | ⏰ **Hora:** {tk['hora']} | 💳 **Pago:** {tk['metodo_pago']}")
-            if tk.get("items"):
-                st.markdown("**Detalle de la cuenta:**")
-                for item_t in tk["items"]:
-                    st.write(f"• **{item_t['cantidad']}x {item_t['producto']}** @ ${item_t['precio_unitario']:,.2f} c/u = **${item_t['subtotal']:,.2f}**")
-            st.markdown(f"#### **Total Cobrado: ${tk['monto']:,.2f}**")
-        with col_tk2:
+        col_tk_head, col_tk_close = st.columns([3, 1])
+        with col_tk_head:
+            st.markdown(f"### 🧾 Ticket de Venta Listo para Imprimir — Folio: `{tk['folio']}`")
+            st.caption("Formato térmico optimizado (150mm). Haz clic en **Imprimir Ticket** para enviar a impresora térmica o guardar como PDF.")
+        with col_tk_close:
             if st.button("❌ Cerrar Ticket", use_container_width=True):
                 del st.session_state.ultimo_ticket
                 st.rerun()
+
+        # Renderizar ticket completo con CSS 150mm, QR para facturar y código de barras Code128
+        render_ticket_component(tk, config, height=720)
 
 st.markdown("---")
 
@@ -855,15 +894,17 @@ with st.sidebar:
                     df_inv.at[p_idx, 'inventario'] = max(0, int(df_inv.at[p_idx, 'inventario']) - cant)
                 df_inv.to_csv(archivo_productos, index=False)
 
-                # Guardar último ticket generado para mostrar en pantalla
+            if es_venta:
+                # Guardar último ticket generado para mostrar e imprimir en pantalla
+                items_guardar = list(st.session_state.carrito_compras) if (tipo_venta == "Producto del Inventario (Cuenta)" and st.session_state.carrito_compras) else []
                 st.session_state.ultimo_ticket = {
                     "folio": folio_str,
                     "fecha": fecha_str,
                     "hora": hora_str,
-                    "monto": monto_final,
+                    "monto": float(monto_final),
                     "metodo_pago": metodo_pago_input,
                     "concepto": concepto_final,
-                    "items": list(st.session_state.carrito_compras)
+                    "items": items_guardar
                 }
                 st.session_state.carrito_compras = []
                 st.session_state.prod_sel_prev = None
@@ -1095,11 +1136,12 @@ st.markdown("---")
 # ==========================================
 # 13. PESTAÑAS
 # ==========================================
-tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_prod, tab_ind, tab_guia = st.tabs([
+tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_ticket, tab_prod, tab_ind, tab_guia = st.tabs([
     "📢 Diagnóstico y Consejos",
     "🛡️ Riesgo y Ubicación",
     "📊 Gráficas",
     "📜 Historial",
+    "🧾 Generador de Tickets (150mm)",
     "📦 Productos y Rentabilidad",
     "🏭 Ingeniería de Planta & CFE",
     "🎓 Guía Financiera"
@@ -1294,6 +1336,159 @@ with tab_tabla:
     else:
         st.info("Aún no tienes movimientos registrados.")
 
+with tab_ticket:
+    st.markdown("### 🧾 Generador, Configurador e Impresión de Tickets Térmicos (150mm)")
+    st.caption("Personaliza los datos impresos, códigos fiscales y emite tickets listos para imprimir con código de barras y QR.")
+
+    subtab_tk1, subtab_tk2, subtab_tk3 = st.tabs([
+        "⚙️ Configurar Variables del Ticket",
+        "🖨️ Crear / Previsualizar Ticket",
+        "📜 Reimprimir Ticket Histórico"
+    ])
+
+    with subtab_tk1:
+        st.markdown("#### 🏢 Datos de la Empresa y Parámetros Fiscales")
+        st.info("💡 Estos campos se reflejan en tiempo real en todos los tickets generados e impresos.")
+
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            nvo_nombre = st.text_input("Nombre de la Empresa / Comercial:", value=config.get("nombre", "Abarrotes y Panadería El Güero"), key="cfg_tk_nombre")
+            nvo_rfc = st.text_input("RFC de la Empresa (SAT):", value=config.get("rfc", "XAXX010101000"), key="cfg_tk_rfc")
+            nvo_icono = st.text_input("Ícono o Logotipo del Ticket (Emoji o símbolo):", value=config.get("icono", "🥖"), key="cfg_tk_icono", help="Por ejemplo: 🥖, 🛒, 🥐, 🏪")
+            nvo_telefono = st.text_input("Teléfono o WhatsApp:", value=config.get("telefono", "595-123-4567"), key="cfg_tk_tel")
+
+        with col_c2:
+            nvo_dir = st.text_area("Dirección Completa de la Empresa:", value=config.get("direccion", "Av. Universidad #15, Chapingo / Texcoco, Edo. Méx."), height=105, key="cfg_tk_dir")
+            col_iva1, col_iva2 = st.columns(2)
+            with col_iva1:
+                nvo_iva = st.number_input("Tasa IVA (%):", min_value=0.0, max_value=30.0, value=float(config.get("tasa_iva", 16.0)), step=1.0, key="cfg_tk_iva")
+            with col_iva2:
+                nvo_inc_iva = st.checkbox("¿Precios incluyen IVA?", value=config.get("incluye_iva", True), key="cfg_tk_inc_iva")
+
+        nvo_notas = st.text_area("Notas al pie del ticket (Agradecimiento / Políticas / Cambios):", value=config.get("notas_ticket", "¡Gracias por su compra! Facturación en línea disponible durante las 72 hrs posteriores a su compra."), height=70, key="cfg_tk_notas")
+        nvo_url = st.text_input("URL base para Facturación Electrónica (generará el Código QR):", value=config.get("url_facturacion", "https://facturacion.sat.gob.mx/portal"), key="cfg_tk_url")
+
+        if st.button("💾 Guardar Configuración de Tickets", use_container_width=True, type="primary"):
+            config["nombre"] = nvo_nombre.strip() if nvo_nombre.strip() else "Mi Empresa"
+            config["rfc"] = nvo_rfc.strip().upper() if nvo_rfc.strip() else "XAXX010101000"
+            config["icono"] = nvo_icono.strip() if nvo_icono.strip() else "🥖"
+            config["telefono"] = nvo_telefono.strip()
+            config["direccion"] = nvo_dir.strip()
+            config["tasa_iva"] = float(nvo_iva)
+            config["incluye_iva"] = bool(nvo_inc_iva)
+            config["notas_ticket"] = nvo_notas.strip()
+            config["url_facturacion"] = nvo_url.strip()
+            st.session_state.config_negocio = config
+            st.success("✅ Configuración de tickets guardada exitosamente.")
+            st.rerun()
+
+    with subtab_tk2:
+        st.markdown("#### 🧾 Emisión y Vista Previa Térmica (150mm)")
+        st.caption("Diseño optimizado para rollo térmico de 150mm. Cuenta con botón de impresión directa `window.print()`.")
+
+        col_pv1, col_pv2 = st.columns([1, 1])
+        with col_pv1:
+            st.markdown("**1. Cargar datos del Ticket:**")
+            opcion_origen = st.radio("Origen de datos:", ["Última venta realizada", "Ticket de prueba personalizado"], horizontal=True)
+
+            if opcion_origen == "Última venta realizada" and st.session_state.get("ultimo_ticket"):
+                tk_preview = dict(st.session_state.ultimo_ticket)
+                st.success(f"Cargado folio `{tk_preview.get('folio')}` por ${tk_preview.get('monto', 0.0):,.2f}")
+            else:
+                # Ticket de prueba
+                tk_preview = {
+                    "folio": f"TK-{date.today().strftime('%Y%m%d')}-0999",
+                    "fecha": date.today().strftime("%Y-%m-%d"),
+                    "hora": datetime.now().strftime("%H:%M"),
+                    "metodo_pago": "💵 Efectivo",
+                    "monto": 84.50,
+                    "concepto": "Venta de mostrador",
+                    "items": [
+                        {"producto": "Bolillo Tradicional (Pza)", "cantidad": 5, "precio_unitario": 3.50, "subtotal": 17.50},
+                        {"producto": "Concha de Vainilla / Chocolate (Pza)", "cantidad": 3, "precio_unitario": 11.00, "subtotal": 33.00},
+                        {"producto": "Cuerno / Croissant Mantequilla (Pza)", "cantidad": 1, "precio_unitario": 14.00, "subtotal": 14.00},
+                        {"producto": "Coca-Cola 600ml", "cantidad": 1, "precio_unitario": 20.00, "subtotal": 20.00}
+                    ]
+                }
+                st.info("Mostrando ticket de prueba con variedad de panadería y abarrotes.")
+
+            st.markdown("---")
+            st.markdown("ℹ️ **Elementos incluidos:**")
+            st.markdown(f"""
+            - **Nombre de Empresa:** `{config.get('nombre')}`
+            - **RFC:** `{config.get('rfc')}`
+            - **Ícono:** {config.get('icono')}
+            - **Dirección:** {config.get('direccion')}
+            - **IVA ({config.get('tasa_iva', 16)}%):** Desglose automático de subtotal e impuesto
+            - **Código QR:** Escaneo directo para portal de facturación
+            - **Código de Barras (Code128):** Identificación única por folio
+            - **Ancho:** 150mm Térmico
+            """)
+
+        with col_pv2:
+            st.markdown("**2. Formato Listo para Imprimir:**")
+            render_ticket_component(tk_preview, config, height=720)
+
+    with subtab_tk3:
+        st.markdown("#### 📜 Reimpresión de Tickets de Ventas Registradas")
+        st.caption("Busca cualquier venta en tu base de datos y vuelve a generar o imprimir su ticket con su código de barras y QR.")
+
+        df_vtas_tk = df_db[df_db['tipo'] == 'venta'].copy()
+        if not df_vtas_tk.empty:
+            df_vtas_tk = df_vtas_tk.sort_values(by=['fecha', 'hora'], ascending=False)
+            opciones_folios = []
+            for _, row_tk in df_vtas_tk.iterrows():
+                f_val = str(row_tk.get('folio', '')).strip()
+                if not f_val or f_val == 'nan':
+                    f_val = f"TK-{str(row_tk['fecha']).replace('-', '')}-0000"
+                opciones_folios.append(f"{f_val} | {row_tk['fecha']} {row_tk.get('hora', '')} | ${float(row_tk['monto']):,.2f} | {row_tk['concepto'][:25]}")
+
+            sel_tk_hist = st.selectbox("Selecciona la transacción a reimprimir:", opciones_folios)
+            sel_folio_elegido = sel_tk_hist.split(" | ")[0].strip()
+
+            fila_vta = df_vtas_tk[df_vtas_tk['folio'] == sel_folio_elegido]
+            if fila_vta.empty:
+                # Búsqueda por posición si folio no coincidía
+                idx_sel = opciones_folios.index(sel_tk_hist)
+                fila_vta = df_vtas_tk.iloc[[idx_sel]]
+
+            row_vta = fila_vta.iloc[0]
+            items_recuperados = []
+            det_str = str(row_vta.get('productos_detalle', ''))
+            if det_str and det_str.startswith("["):
+                try:
+                    items_recuperados = json.loads(det_str)
+                except Exception:
+                    pass
+
+            tk_reimprimir = {
+                "folio": str(row_vta.get('folio', sel_folio_elegido)),
+                "fecha": str(row_vta['fecha']),
+                "hora": str(row_vta.get('hora', '12:00')),
+                "metodo_pago": str(row_vta.get('metodo_pago', 'Efectivo')),
+                "monto": float(row_vta['monto']),
+                "concepto": str(row_vta.get('concepto', 'Venta')),
+                "items": items_recuperados
+            }
+
+            col_reimp1, col_reimp2 = st.columns([1, 1])
+            with col_reimp1:
+                st.success(f"🧾 **Ticket Seleccionado:** `{tk_reimprimir['folio']}`")
+                st.write(f"📅 **Fecha:** {tk_reimprimir['fecha']} {tk_reimprimir['hora']}")
+                st.write(f"💳 **Método de Pago:** {tk_reimprimir['metodo_pago']}")
+                st.write(f"💵 **Total:** ${tk_reimprimir['monto']:,.2f}")
+                if items_recuperados:
+                    st.write("**Productos incluidos:**")
+                    for it_r in items_recuperados:
+                        st.write(f"- {it_r.get('cantidad', 1)}x {it_r.get('producto')} (${it_r.get('subtotal', 0.0):,.2f})")
+                else:
+                    st.write(f"**Concepto:** {tk_reimprimir['concepto']}")
+
+            with col_reimp2:
+                render_ticket_component(tk_reimprimir, config, height=700)
+        else:
+            st.info("Aún no hay ventas registradas para reimprimir.")
+
 with tab_prod:
     st.markdown("### 📦 Análisis de Rentabilidad e Inventario")
     st.markdown("Edita tu inventario directamente en la tabla haciendo doble clic en las celdas. Registra tus **Ventas de Hoy** y presiona el botón para descontarlas automáticamente.")
@@ -1302,7 +1497,27 @@ with tab_prod:
     
     # Crea el archivo automáticamente con Inventario y Ventas si no existe
     if not os.path.exists(archivo_productos):
-        default_data = "producto,categoria,costo_compra,precio_venta,inventario,unidades_vendidas_hoy\nCoca-Cola 600ml,Bebidas,13.00,18.00,50,0\nGansito Marinela,Snacks,14.00,18.00,30,0\nLeche Alpura 1L,Lácteos,21.00,26.00,20,0\nFrijol Pinto 1kg,Abarrotes,30.00,42.00,15,0\nHuevos (Docena),Abarrotes,28.00,38.00,10,0\nPan Bimbo Blanco,Panadería,35.00,45.00,12,0\nSabritas Sal 42g,Snacks,12.00,16.00,40,0\nTortillas 1kg,Alimentos,18.00,22.00,20,0\nAtún Dolores en Agua,Abarrotes,16.00,21.00,25,0\nCerveza Corona 355ml,Bebidas,15.00,22.00,60,0"
+        default_data = (
+            "producto,categoria,costo_compra,precio_venta,inventario,unidades_vendidas_hoy\n"
+            "Coca-Cola 600ml,Bebidas,13.00,18.00,50,0\n"
+            "Gansito Marinela,Snacks,14.00,18.00,30,0\n"
+            "Leche Alpura 1L,Lácteos,21.00,26.00,20,0\n"
+            "Frijol Pinto 1kg,Abarrotes,30.00,42.00,15,0\n"
+            "Huevos (Docena),Abarrotes,28.00,38.00,10,0\n"
+            "Pan Bimbo Blanco,Panadería,35.00,45.00,12,0\n"
+            "Bolillo Tradicional (Pza),Panadería,1.80,3.50,80,0\n"
+            "Telera para Torta (Pza),Panadería,2.00,4.00,60,0\n"
+            "Concha de Vainilla / Chocolate (Pza),Panadería,5.50,11.00,45,0\n"
+            "Cuerno / Croissant Mantequilla (Pza),Panadería,7.00,14.00,35,0\n"
+            "Baguette Artesanal 250g,Panadería,12.00,24.00,25,0\n"
+            "Pan de Caja Integral 680g (Grande),Panadería,38.00,52.00,20,0\n"
+            "Pan Molido Clásico 250g,Panadería,14.00,22.00,30,0\n"
+            "Pan Tostado Clásico 210g,Panadería,22.00,32.00,25,0\n"
+            "Sabritas Sal 42g,Snacks,12.00,16.00,40,0\n"
+            "Tortillas 1kg,Alimentos,18.00,22.00,20,0\n"
+            "Atún Dolores en Agua,Abarrotes,16.00,21.00,25,0\n"
+            "Cerveza Corona 355ml,Bebidas,15.00,22.00,60,0"
+        )
         with open(archivo_productos, "w", encoding="utf-8") as f:
             f.write(default_data)
             

@@ -3,3 +3,8 @@ from .inversion_inicial import render_inversion_inicial
 from .cotizaciones_presupuestos import render_cotizaciones_presupuestos
 from .diagrama_flujo import render_diagrama_flujo
 from .balance_energetico import render_balance_energetico
+from .ticket_printer import (
+    render_ticket_component,
+    mostrar_dialogo_ticket,
+    generar_html_ticket
+)
