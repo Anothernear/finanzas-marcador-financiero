@@ -92,6 +92,14 @@ def generar_html_ticket(tk: dict, config: dict) -> str:
     monto_total = float(tk.get("monto", 0.0))
     items = tk.get("items", [])
     concepto_general = str(tk.get("concepto", ""))
+    info_verif = tk.get("verificacion_pago", {}) if isinstance(tk.get("verificacion_pago"), dict) else {}
+    ref_pago = html.escape(str(info_verif.get("referencia", f"AUTH-{abs(hash(folio)) % 900000 + 100000}")))
+    efectivo_rec = float(info_verif.get("efectivo_recibido", monto_total))
+    cambio_dev = float(info_verif.get("cambio", max(0.0, efectivo_rec - monto_total)))
+    if "Efectivo" in metodo_pago:
+        detalle_verif_html = f'<div class="totales-row" style="font-size:11px; color:#333;"><span>Efectivo Recibido:</span><span>${efectivo_rec:,.2f}</span></div><div class="totales-row" style="font-size:11px; color:#333;"><span>Cambio Entregado:</span><span>${cambio_dev:,.2f}</span></div>'
+    else:
+        detalle_verif_html = f'<div class="totales-row" style="font-size:11px; color:#333;"><span>Ref / Autorización:</span><span>{ref_pago}</span></div>'
 
     # URL QR para facturación
     url_qr_factura = f"{url_base_fac}?folio={folio}&monto={monto_total:.2f}&rfc={rfc}&fecha={fecha}"
@@ -378,6 +386,11 @@ def generar_html_ticket(tk: dict, config: dict) -> str:
             <span>TOTAL:</span>
             <span>${monto_total:,.2f} MXN</span>
         </div>
+        {detalle_verif_html}
+        <div style="margin-top:6px; padding:4px; text-align:center; border:1.5px solid #16a34a; border-radius:4px; font-weight:900; font-size:11px; color:#15803d; background:#f0fdf4;">
+            ✅ PAGO VERIFICADO — MERCANCÍA LIQUIDADA
+        </div>
+        </div>
     </div>
 
     <!-- NOTAS / LEYENDAS FISCALES -->
@@ -418,3 +431,75 @@ def mostrar_dialogo_ticket(tk: dict, config: dict):
     """Modal emergente para visualizar e imprimir cualquier ticket del sistema."""
     st.caption(f"Folio: `{tk.get('folio', 'N/A')}` | Total: **${tk.get('monto', 0.0):,.2f}** | Pago: {tk.get('metodo_pago', 'Efectivo')}")
     render_ticket_component(tk, config, height=650)
+
+
+def render_verificador_pago_simulado(metodo_pago: str, monto_total: float, key_prefix: str = "pos") -> dict:
+    """
+    Simulador interactivo de verificación de pago en caja (Efectivo / Tarjeta / Transferencia SPEI).
+    Devuelve un diccionario con 'pagado_verificado' (bool), 'efectivo_recibido', 'cambio' y 'referencia'.
+    """
+    if monto_total <= 0:
+        return {"pagado_verificado": False, "efectivo_recibido": 0.0, "cambio": 0.0, "referencia": ""}
+
+    st.markdown("##### 🛡️ Simulador de Verificación de Pago")
+    if "Efectivo" in metodo_pago:
+        efectivo_rec = st.number_input(
+            "💵 Efectivo recibido del cliente ($):",
+            min_value=0.0,
+            value=float(monto_total),
+            step=10.0,
+            key=f"{key_prefix}_efectivo_rec_{int(monto_total)}"
+        )
+        cambio = efectivo_rec - monto_total
+        if cambio >= 0:
+            st.success(f"✅ **Pago en Efectivo Verificado** | 🔄 **Cambio a devolver: ${cambio:,.2f} MXN**")
+            return {
+                "pagado_verificado": True,
+                "efectivo_recibido": float(efectivo_rec),
+                "cambio": float(cambio),
+                "referencia": "EFECTIVO-CAJA"
+            }
+        else:
+            st.error(f"⚠️ **Pago incompleto:** Faltan **${abs(cambio):,.2f} MXN** por cubrir.")
+            return {
+                "pagado_verificado": False,
+                "efectivo_recibido": float(efectivo_rec),
+                "cambio": 0.0,
+                "referencia": ""
+            }
+
+    elif "Tarjeta" in metodo_pago:
+        col_t1, col_t2 = st.columns([1.2, 1.3])
+        with col_t1:
+            ultimos_4 = st.text_input("💳 Últimos 4 dígitos:", value="4821", max_chars=4, key=f"{key_prefix}_card4")
+        with col_t2:
+            cod_auth = f"AUTH-{abs(hash(f'{ultimos_4}_{monto_total}')) % 900000 + 100000}"
+            st.text_input("🔐 Autorización PinPad:", value=cod_auth, disabled=True, key=f"{key_prefix}_auth_{int(monto_total)}")
+        aprobado = st.checkbox("✅ Confirmar cobro aprobado en Terminal Bancaria (PinPad)", value=True, key=f"{key_prefix}_chk_card")
+        if aprobado:
+            st.success(f"✅ **Terminal Bancaria Verificada:** Tarjeta `*{ultimos_4}` — Código `{cod_auth}`")
+        else:
+            st.warning("⏳ Esperando confirmación de la Terminal Bancaria...")
+        return {
+            "pagado_verificado": bool(aprobado),
+            "efectivo_recibido": float(monto_total),
+            "cambio": 0.0,
+            "referencia": f"TARJETA-*{ultimos_4}-{cod_auth}"
+        }
+
+    else:
+        # Transferencia SPEI / CoDi
+        ref_spei = f"SPEI-{abs(hash(f'spei_{monto_total}')) % 900000 + 100000}"
+        clave_rastreo = st.text_input("🏦 Clave de Rastreo / Referencia SPEI:", value=ref_spei, key=f"{key_prefix}_spei_{int(monto_total)}")
+        verif_spei = st.checkbox("✅ Confirmar transferencia reflejada en cuenta empresarial", value=True, key=f"{key_prefix}_chk_spei")
+        if verif_spei:
+            st.success(f"✅ **Transferencia SPEI Verificada:** Ref `{clave_rastreo}` por **${monto_total:,.2f}**")
+        else:
+            st.warning("⏳ Verifica que la transferencia haya entrado antes de entregar la mercancía.")
+        return {
+            "pagado_verificado": bool(verif_spei),
+            "efectivo_recibido": float(monto_total),
+            "cambio": 0.0,
+            "referencia": str(clave_rastreo)
+        }
+

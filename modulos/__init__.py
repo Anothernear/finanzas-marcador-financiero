@@ -25,3 +25,13 @@ from .ticket_printer import (
     generar_html_ticket
 )
 
+
+# Módulo de Sistema Integral (Reorden, Fotos, Divisas, Geolocalización, CFDI y Razones Financieras)
+from .sistema_integral import (
+    generar_svg_producto,
+    asegurar_columnas_productos,
+    render_analisis_inventarios_y_galeria,
+    render_sugerencias_geolocalizacion_y_mercado,
+    render_modulo_facturacion_cfdi,
+    render_areas_y_razones_financieras
+)

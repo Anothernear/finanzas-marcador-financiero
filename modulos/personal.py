@@ -6,7 +6,8 @@ import json
 from datetime import datetime, date
 from modulos.auth import cargar_usuarios, guardar_usuarios, hash_password, render_user_badge_sidebar
 from modulos.biometrico import modal_simulador_huella
-from modulos.ticket_printer import mostrar_dialogo_ticket
+from modulos.ticket_printer import mostrar_dialogo_ticket, render_verificador_pago_simulado
+from modulos.sistema_integral import generar_svg_producto, asegurar_columnas_productos
 
 def actualizar_metodo_pago_ticket(folio: str, nuevo_metodo: str, csv_file: str = "hermes_financial_db.csv") -> bool:
     """
@@ -447,7 +448,7 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
     # Cargar inventario de productos
     df_inv = None
     if os.path.exists(archivo_productos):
-        df_inv = pd.read_csv(archivo_productos)
+        df_inv = asegurar_columnas_productos(pd.read_csv(archivo_productos, dtype={"codigo_barras": str}), tc_usd=float(st.session_state.get("tc_usd", 19.85)), tc_eur=float(st.session_state.get("tc_eur", 21.40)))
         if 'inventario' not in df_inv.columns:
             df_inv['inventario'] = 50
 
@@ -484,6 +485,17 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
 
             # Indicadores de stock y precio
             color_stock = '#16a34a' if inv_disp > 5 else ('#ea580c' if inv_disp > 0 else '#dc2626')
+            cat_emp_p = str(df_inv.at[p_idx, 'categoria']) if 'categoria' in df_inv.columns else ''
+            foto_emp_p = str(df_inv.at[p_idx, 'foto_url']) if ('foto_url' in df_inv.columns and pd.notna(df_inv.at[p_idx, 'foto_url']) and str(df_inv.at[p_idx, 'foto_url']).strip() != '') else generar_svg_producto(producto_sel, cat_emp_p)
+            cod_emp_p = str(df_inv.at[p_idx, 'codigo_barras']) if ('codigo_barras' in df_inv.columns and pd.notna(df_inv.at[p_idx, 'codigo_barras'])) else f"75010553{1000 + p_idx:04d}"
+            rop_emp_p = int(df_inv.at[p_idx, 'punto_reorden']) if ('punto_reorden' in df_inv.columns and pd.notna(df_inv.at[p_idx, 'punto_reorden'])) else 15
+            c_eimg, c_ecard = st.columns([1, 2.5])
+            with c_eimg:
+                st.image(foto_emp_p, use_container_width=True)
+            with c_ecard:
+                st.caption(f"🏷️ Categoría: **{cat_emp_p or 'General'}** | ║▌║ Código: `{cod_emp_p}` | Punto Reorden: **{rop_emp_p} u.**")
+                if inv_disp <= rop_emp_p:
+                    st.warning(f"⚠️ Producto en Punto de Reorden ({inv_disp} <= {rop_emp_p} unidades). Avisar a Almacén.")
             st.markdown(f"""
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 8px; margin: 8px 0 14px 0; display: flex; justify-content: space-between; align-items: center;">
                 <div>
@@ -611,6 +623,7 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
                 </div>
                 """, unsafe_allow_html=True)
 
+                info_verif_emp = render_verificador_pago_simulado(metodo_pago_sel, total_cuenta, key_prefix="emp_pos")
                 col_btn_cob1, col_btn_cob2 = st.columns([2, 1])
                 with col_btn_cob1:
                     btn_cobrar_pos = st.button("💾 Cobrar y Generar Ticket", type="primary", use_container_width=True, key="btn_cobrar_pos_empleado")
@@ -621,7 +634,9 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
                         st.session_state.cant_key_ver += 1
                         st.rerun()
 
-                if btn_cobrar_pos:
+                if btn_cobrar_pos and not info_verif_emp.get("pagado_verificado", True):
+                    st.error("⚠️ No se puede emitir el ticket hasta verificar que el pago del cliente esté completo / aprobado.")
+                elif btn_cobrar_pos:
                     fecha_str = fecha_input.strftime("%Y-%m-%d")
                     hora_str = datetime.now().strftime("%H:%M")
                     
@@ -659,7 +674,8 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
                         p_item_idx = item['producto_idx']
                         cant = item['cantidad']
                         df_inv.at[p_item_idx, 'inventario'] = max(0, int(df_inv.at[p_item_idx, 'inventario']) - cant)
-                    df_inv.to_csv(archivo_productos, index=False)
+                    cols_save_emp = [c for c in ['producto', 'categoria', 'codigo_barras', 'moneda_origen', 'costo_moneda_origen', 'costo_compra', 'precio_venta', 'inventario', 'punto_reorden', 'unidades_vendidas_hoy', 'ruta_imagen'] if c in df_inv.columns]
+                    df_inv[cols_save_emp].to_csv(archivo_productos, index=False)
 
                     # Guardar último ticket
                     st.session_state.ultimo_ticket = {
@@ -669,7 +685,8 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
                         "monto": total_cuenta,
                         "metodo_pago": metodo_pago_sel,
                         "concepto": concepto_final,
-                        "items": list(st.session_state.carrito_compras)
+                        "items": list(st.session_state.carrito_compras),
+                        "verificacion_pago": info_verif_emp
                     }
 
                     if es_fecha_modificada:
@@ -706,8 +723,8 @@ def render_dashboard_empleado(df_db: pd.DataFrame, usuario_actual: dict, m: dict
             df_mostrar_p['categoria'].astype(str).str.contains(busq_prod, case=False, na=False)
         ]
 
-    df_mostrar_cajero = df_mostrar_p[['producto', 'categoria', 'precio_venta', 'inventario']].copy()
-    df_mostrar_cajero.columns = ['Producto', 'Categoría', 'Precio al Público ($)', 'Stock Disponible']
-    st.dataframe(df_mostrar_cajero, use_container_width=True)
+    df_mostrar_cajero = df_mostrar_p[['foto_url', 'producto', 'categoria', 'codigo_barras', 'precio_venta', 'inventario']].copy()
+    df_mostrar_cajero.columns = ['📸 Foto', 'Producto', 'Categoría', '║▌║ Código', 'Precio al Público ($)', 'Stock Disponible']
+    st.dataframe(df_mostrar_cajero, use_container_width=True, column_config={"📸 Foto": st.column_config.ImageColumn("📸 Foto")})
 
 

@@ -21,7 +21,31 @@ from modulos import (
     actualizar_metodo_pago_ticket,
     render_ticket_component,
     mostrar_dialogo_ticket,
-    generar_html_ticket
+    generar_html_ticket,
+    generar_svg_producto,
+    asegurar_columnas_productos,
+    render_analisis_inventarios_y_galeria,
+    render_sugerencias_geolocalizacion_y_mercado,
+    render_modulo_facturacion_cfdi,
+    render_areas_y_razones_financieras
+)
+import importlib
+import modulos.sistema_integral as _si_mod
+import modulos.personal as _pers_mod
+import modulos.ticket_printer as _tp_mod
+importlib.reload(_tp_mod)
+from modulos.ticket_printer import render_ticket_component, mostrar_dialogo_ticket, generar_html_ticket, render_verificador_pago_simulado
+importlib.reload(_si_mod)
+importlib.reload(_pers_mod)
+from modulos.personal import render_administracion_personal, render_dashboard_empleado, actualizar_metodo_pago_ticket
+from modulos.sistema_integral import (
+    generar_svg_producto,
+    asegurar_columnas_productos,
+    render_analisis_inventarios_y_galeria,
+    render_sugerencias_geolocalizacion_y_mercado,
+    render_modulo_facturacion_cfdi,
+    render_areas_y_razones_financieras
+
 )
 
 # ==========================================
@@ -450,6 +474,7 @@ def calcular_capas_financieras(df, config):
             "gastos_totales": round(gastos_totales, 2),
             "margen_bruto_pct": round(margen_bruto_pct, 1),
             "margen_operativo_pct": round(margen_operativo_pct, 1),
+            "margen_neto_pct": round(margen_operativo_pct, 1),
             "punto_equilibrio_diario": round(punto_equilibrio_diario, 2) if punto_equilibrio_diario != float('inf') else 0.0,
             "promedio_venta_diaria": round(promedio_venta_diaria, 2),
             "utilidad_neta": round(utilidad_operativa, 2),
@@ -473,6 +498,7 @@ def calcular_capas_financieras(df, config):
             "van_mensual": round(van_mensual, 2),
             "van_anual": round(van_anual, 2),
             "tir_anual_pct": round(tir_anual, 1),
+            "tir_estimada_pct": round(tir_anual, 1),
             "payback_meses": round(payback_meses, 1)
         },
         "caja": {
@@ -781,7 +807,7 @@ with st.sidebar:
     if es_venta:
         # Cargar inventario
         if os.path.exists(archivo_productos):
-            df_inv = pd.read_csv(archivo_productos)
+            df_inv = asegurar_columnas_productos(pd.read_csv(archivo_productos, dtype={"codigo_barras": str}), tc_usd=float(st.session_state.get("tc_usd", 19.85)), tc_eur=float(st.session_state.get("tc_eur", 21.40)))
             if 'inventario' not in df_inv.columns:
                 df_inv['inventario'] = 50
         
@@ -807,7 +833,19 @@ with st.sidebar:
             precio_unitario = float(df_inv.at[producto_idx, 'precio_venta'])
             inv_disponible = int(df_inv.at[producto_idx, 'inventario'])
             
-            st.caption(f"Stock disponible: {inv_disponible} unidades | Precio: ${precio_unitario:,.2f}")
+            cat_sel_pos = str(df_inv.at[producto_idx, 'categoria']) if 'categoria' in df_inv.columns else ''
+            foto_sel_pos = str(df_inv.at[producto_idx, 'foto_url']) if ('foto_url' in df_inv.columns and pd.notna(df_inv.at[producto_idx, 'foto_url']) and str(df_inv.at[producto_idx, 'foto_url']).strip() != '') else generar_svg_producto(producto_sel, cat_sel_pos)
+            cod_sel_pos = str(df_inv.at[producto_idx, 'codigo_barras']) if ('codigo_barras' in df_inv.columns and pd.notna(df_inv.at[producto_idx, 'codigo_barras'])) else f"75010553{1000 + producto_idx:04d}"
+            rop_sel_pos = int(df_inv.at[producto_idx, 'punto_reorden']) if ('punto_reorden' in df_inv.columns and pd.notna(df_inv.at[producto_idx, 'punto_reorden'])) else 15
+            c_img_pos, c_inf_pos = st.columns([1, 1.6])
+            with c_img_pos:
+                st.image(foto_sel_pos, use_container_width=True)
+            with c_inf_pos:
+                st.markdown(f"**${precio_unitario:,.2f} MXN**")
+                st.caption(f"📦 Stock: **{inv_disponible}** u. (ROP: {rop_sel_pos})")
+                st.caption(f"║▌║ `{cod_sel_pos}`")
+            if inv_disponible <= rop_sel_pos:
+                st.warning(f"⚠️ En Punto de Reorden ({inv_disponible} <= {rop_sel_pos} u.)")
             
             # Widget key dinámico por versión de llave (solución infalible para reiniciar widgets en Streamlit)
             widget_key = f"cant_input_ver_{st.session_state.cant_key_ver}"
@@ -892,6 +930,22 @@ with st.sidebar:
         monto_final = st.number_input("Monto en dinero ($)", min_value=1.0, step=50.0, value=150.0)
         if es_costo_var:
             concepto_def = "Compra de refrescos / abarrotes"
+            if os.path.exists(archivo_productos):
+                df_inv_compra = asegurar_columnas_productos(pd.read_csv(archivo_productos, dtype={"codigo_barras": str}), tc_usd=float(st.session_state.get("tc_usd", 19.85)), tc_eur=float(st.session_state.get("tc_eur", 21.40)))
+                if not df_inv_compra.empty:
+                    prod_compra_sel = st.selectbox("📦 Producto o Insumo a comprar:", ["➕ Insumo General / Varios"] + df_inv_compra['producto'].tolist(), key="sel_prod_compra_sb")
+                    if prod_compra_sel != "➕ Insumo General / Varios":
+                        idx_c = df_inv_compra.index[df_inv_compra['producto'] == prod_compra_sel].tolist()[0]
+                        foto_c = str(df_inv_compra.at[idx_c, 'foto_url'])
+                        costo_c = float(df_inv_compra.at[idx_c, 'costo_compra'])
+                        stock_c = int(df_inv_compra.at[idx_c, 'inventario'])
+                        c_ic1, c_ic2 = st.columns([1, 1.6])
+                        with c_ic1:
+                            st.image(foto_c, use_container_width=True)
+                        with c_ic2:
+                            st.markdown(f"**Costo: ${costo_c:,.2f}**")
+                            st.caption(f"📦 Stock actual: **{stock_c}** u.")
+                        concepto_def = f"Compra de {prod_compra_sel}"
             ayuda_concepto = "Mercancía para revender o ingredientes."
         else:
             concepto_def = "Renta del local"
@@ -916,13 +970,17 @@ with st.sidebar:
 
     if mostrar_pago:
         metodo_pago_input = st.selectbox("💳 Método de cobro:", METODOS_PAGO)
+        info_verif_sb = render_verificador_pago_simulado(metodo_pago_input, monto_final, key_prefix="ger_sb") if monto_final > 0 else {"pagado_verificado": True}
     else:
         metodo_pago_input = ""
+        info_verif_sb = {"pagado_verificado": True}
 
     btn_guardar = st.button("💾 Cobrar y Generar Ticket" if es_venta else "💾 Guardar Movimiento", use_container_width=True, type="primary")
     if btn_guardar:
         if es_venta and len(st.session_state.carrito_compras) == 0:
             st.error("⚠️ La cuenta está vacía (0 productos). Asigna cantidad a al menos un producto antes de cobrar.")
+        elif es_venta and not info_verif_sb.get("pagado_verificado", True):
+            st.error("⚠️ El pago del cliente aún no ha sido verificado o está incompleto.")
         else:
             fecha_str = fecha_input.strftime("%Y-%m-%d")
             hora_str = datetime.now().strftime("%H:%M")
@@ -961,7 +1019,8 @@ with st.sidebar:
                     p_idx = item['producto_idx']
                     cant = item['cantidad']
                     df_inv.at[p_idx, 'inventario'] = max(0, int(df_inv.at[p_idx, 'inventario']) - cant)
-                df_inv.to_csv(archivo_productos, index=False)
+                cols_save_sb = [c for c in ['producto', 'categoria', 'codigo_barras', 'moneda_origen', 'costo_moneda_origen', 'costo_compra', 'precio_venta', 'inventario', 'punto_reorden', 'unidades_vendidas_hoy', 'ruta_imagen'] if c in df_inv.columns]
+                df_inv[cols_save_sb].to_csv(archivo_productos, index=False)
 
             if es_venta:
                 # Guardar último ticket generado para mostrar e imprimir en pantalla
@@ -973,7 +1032,8 @@ with st.sidebar:
                     "monto": float(monto_final),
                     "metodo_pago": metodo_pago_input,
                     "concepto": concepto_final,
-                    "items": items_guardar
+                    "items": items_guardar,
+                    "verificacion_pago": info_verif_sb
                 }
                 st.session_state.carrito_compras = []
                 st.session_state.prod_sel_prev = None
@@ -1208,14 +1268,14 @@ st.markdown("---")
 # ==========================================
 # 13. PESTAÑAS
 # ==========================================
-tab_diag, tab_riesgo, tab_graf, tab_tabla, tab_ticket, tab_prod, tab_ind, tab_personal, tab_guia = st.tabs([
-
+tab_diag, tab_areas, tab_riesgo, tab_graf, tab_tabla, tab_ticket, tab_prod, tab_ind, tab_personal, tab_guia = st.tabs([
     "📢 Diagnóstico y Consejos",
-    "🛡️ Riesgo y Ubicación",
-    "📊 Gráficas",
+    "🏢 Áreas y Razones Financieras",
+    "🛡️ Geolocalización, Riesgo y Mercado",
+    "📊 Gráficas y Tendencias",
     "📜 Historial",
-    "🧾 Generador de Tickets (150mm)",
-    "📦 Productos y Rentabilidad",
+    "🧾 Tickets, Barras y Facturación CFDI",
+    "📦 Inventario, Reorden, Fotos y Divisas",
     "🏭 Ingeniería de Planta & CFE",
     "👥 Personal & Auditoría",
     "🎓 Guía Financiera"
@@ -1250,6 +1310,10 @@ with tab_diag:
         2. **Monitorea tu TIR:** Si supera el rendimiento exigido del lugar, el negocio justifica plenamente el esfuerzo.
         """)
 
+with tab_areas:
+    df_prod_areas = asegurar_columnas_productos(pd.read_csv("productos_template.csv"), tc_usd=float(st.session_state.get("tc_usd", 19.85)), tc_eur=float(st.session_state.get("tc_eur", 21.40))) if os.path.exists("productos_template.csv") else pd.DataFrame()
+    render_areas_y_razones_financieras(calculos, config, df_db, df_prod_areas)
+
 with tab_riesgo:
     st.markdown(f"### 🛡️ Análisis de Riesgo — {n['ubicacion_estado']}")
 
@@ -1281,6 +1345,8 @@ with tab_riesgo:
     st.dataframe(df_zonas, use_container_width=True)
     if tu_zona_idx is not None:
         st.caption(f"📍 Tu zona actual: **{n['tipo_zona']}** (fila {tu_zona_idx + 1})")
+    df_prod_geo = pd.read_csv("productos_template.csv") if os.path.exists("productos_template.csv") else pd.DataFrame()
+    render_sugerencias_geolocalizacion_y_mercado(config, n, df_prod_geo)
 
 with tab_graf:
     col_g1, col_g2 = st.columns(2)
@@ -1414,10 +1480,11 @@ with tab_ticket:
     st.markdown("### 🧾 Generador, Configurador e Impresión de Tickets Térmicos (150mm)")
     st.caption("Personaliza los datos impresos, códigos fiscales y emite tickets listos para imprimir con código de barras y QR.")
 
-    subtab_tk1, subtab_tk2, subtab_tk3 = st.tabs([
+    subtab_tk1, subtab_tk2, subtab_tk3, subtab_tk4 = st.tabs([
         "⚙️ Configurar Variables del Ticket",
         "🖨️ Crear / Previsualizar Ticket",
-        "📜 Reimprimir Ticket Histórico"
+        "📜 Reimprimir Ticket Histórico",
+        "📄 Facturación Electrónica (CFDI 4.0)"
     ])
 
     with subtab_tk1:
@@ -1576,6 +1643,9 @@ with tab_ticket:
         else:
             st.info("Aún no hay ventas registradas para reimprimir.")
 
+    with subtab_tk4:
+        render_modulo_facturacion_cfdi(df_db, config)
+
 with tab_prod:
     st.markdown("### 📦 Análisis de Rentabilidad e Inventario")
     st.markdown("Edita tu inventario directamente en la tabla haciendo doble clic en las celdas. Registra tus **Ventas de Hoy** y presiona el botón para descontarlas automáticamente.")
@@ -1608,7 +1678,24 @@ with tab_prod:
         with open(archivo_productos, "w", encoding="utf-8") as f:
             f.write(default_data)
             
-    df_prod = pd.read_csv(archivo_productos)
+    # --- PANEL DE TIPO DE CAMBIO PARA PRODUCTOS IMPORTADOS ---
+    with st.container(border=True):
+        st.markdown("##### 💱 Control de Divisas y Tipo de Cambio (Productos Nacionales e Importados)")
+        col_tc1, col_tc2, col_tc3 = st.columns([1, 1, 2])
+        with col_tc1:
+            tc_usd = st.number_input("🇺🇸 Tipo de Cambio USD / MXN ($):", min_value=10.0, max_value=40.0, value=float(st.session_state.get("tc_usd", 19.85)), step=0.10, key="input_tc_usd")
+            st.session_state.tc_usd = tc_usd
+        with col_tc2:
+            tc_eur = st.number_input("🇪🇺 Tipo de Cambio EUR / MXN ($):", min_value=10.0, max_value=45.0, value=float(st.session_state.get("tc_eur", 21.40)), step=0.10, key="input_tc_eur")
+            st.session_state.tc_eur = tc_eur
+        with col_tc3:
+            st.info("💡 **Productos Importados:** Si cambias la columna **🌍 Moneda** de un producto a `USD (Importado)` o `EUR (Importado)` y defines su `Costo Origen`, el sistema convierte automáticamente su costo a pesos mexicanos (MXN) y recalcula tus márgenes.")
+
+    df_prod = pd.read_csv(archivo_productos, dtype={"codigo_barras": str})
+    df_prod = asegurar_columnas_productos(df_prod, tc_usd=tc_usd, tc_eur=tc_eur)
+    for col_txt in ["producto", "categoria", "codigo_barras", "moneda_origen", "ruta_imagen", "foto_url", "Estado Stock"]:
+        if col_txt in df_prod.columns:
+            df_prod[col_txt] = df_prod[col_txt].astype(str)
     
     # Compatibilidad si el archivo viejo no tenía estas columnas
     if 'inventario' not in df_prod.columns:
@@ -1629,9 +1716,17 @@ with tab_prod:
         df_prod,
         use_container_width=True,
         num_rows="dynamic", # Permite añadir nuevas filas (productos)
-        disabled=["Ganancia Neta ($)", "Rentabilidad (Margen %)", "Unidades para sacar el día"],
+        disabled=["Ganancia Neta ($)", "Rentabilidad (Margen %)", "Unidades para sacar el día", "Estado Stock"],
+        column_order=["foto_url", "producto", "categoria", "ruta_imagen", "codigo_barras", "moneda_origen", "costo_moneda_origen", "costo_compra", "precio_venta", "inventario", "punto_reorden", "Estado Stock", "unidades_vendidas_hoy", "Ganancia Neta ($)", "Rentabilidad (Margen %)", "Unidades para sacar el día"],
         column_config={
+            "foto_url": st.column_config.ImageColumn("📸 Foto", help="Fotografía o ilustración del producto"),
+            "ruta_imagen": st.column_config.TextColumn("📂 Ruta / URL Imagen", help="Ej: imagenes_productos/coca_cola.png o https://..."),
             "producto": st.column_config.TextColumn("Producto", required=True),
+            "codigo_barras": st.column_config.TextColumn("║▌║ Código Barras"),
+            "moneda_origen": st.column_config.SelectboxColumn("🌍 Moneda", options=["MXN (Nacional)", "USD (Importado)", "EUR (Importado)"], required=True),
+            "costo_moneda_origen": st.column_config.NumberColumn("Costo Origen", format="%.2f", min_value=0),
+            "punto_reorden": st.column_config.NumberColumn("Punto Reorden (ROP)", min_value=0, step=1),
+            "Estado Stock": st.column_config.TextColumn("Estado Stock"),
             "categoria": st.column_config.TextColumn("Categoría"),
             "costo_compra": st.column_config.NumberColumn("Costo Compra ($)", format="$%.2f", min_value=0),
             "precio_venta": st.column_config.NumberColumn("Precio Venta ($)", format="$%.2f", min_value=0),
@@ -1641,14 +1736,15 @@ with tab_prod:
             "Rentabilidad (Margen %)": st.column_config.NumberColumn("Margen", format="%.1f%%"),
             "Unidades para sacar el día": st.column_config.NumberColumn("Meta Diaria (Unid.)", format="%d")
         },
-        key="editor_productos"
+        key="editor_productos_v2"
     )
     
     # --- BOTONES DE ACCIÓN ---
     col1, col2 = st.columns(2)
     with col1:
         if st.button("💾 Guardar Cambios Manuales", use_container_width=True):
-            cols_to_save = ['producto', 'categoria', 'costo_compra', 'precio_venta', 'inventario', 'unidades_vendidas_hoy']
+            edited_df = asegurar_columnas_productos(edited_df, tc_usd=tc_usd, tc_eur=tc_eur)
+            cols_to_save = ['producto', 'categoria', 'codigo_barras', 'moneda_origen', 'costo_moneda_origen', 'costo_compra', 'precio_venta', 'inventario', 'punto_reorden', 'unidades_vendidas_hoy', 'ruta_imagen']
             edited_df[cols_to_save].to_csv(archivo_productos, index=False)
             st.success("¡Datos e inventario guardados!")
             st.rerun()
@@ -1663,7 +1759,8 @@ with tab_prod:
             edited_df['unidades_vendidas_hoy'] = 0 
             
             # Guardar el archivo
-            cols_to_save = ['producto', 'categoria', 'costo_compra', 'precio_venta', 'inventario', 'unidades_vendidas_hoy']
+            edited_df = asegurar_columnas_productos(edited_df, tc_usd=tc_usd, tc_eur=tc_eur)
+            cols_to_save = ['producto', 'categoria', 'codigo_barras', 'moneda_origen', 'costo_moneda_origen', 'costo_compra', 'precio_venta', 'inventario', 'punto_reorden', 'unidades_vendidas_hoy', 'ruta_imagen']
             edited_df[cols_to_save].to_csv(archivo_productos, index=False)
             
             st.success("¡Ventas procesadas exitosamente! El inventario se ha actualizado.")
@@ -1684,6 +1781,9 @@ with tab_prod:
             """, unsafe_allow_html=True)
         except Exception:
             pass
+
+    st.markdown("---")
+    render_analisis_inventarios_y_galeria(edited_df, archivo_productos)
 
     # --- PRODUCTO MÁS Y MENOS VENDIDO ---
     st.markdown("---")
