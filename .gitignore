@@ -1,0 +1,17 @@
+# Entornos virtuales y portables
+python_portable/
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Descargas temporales
+python_embed.zip
+get-pip.py
+
+# Streamlit logs/cache
+.streamlit/cache/
