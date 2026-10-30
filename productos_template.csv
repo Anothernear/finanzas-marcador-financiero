@@ -1,6 +1,5 @@
-<<<<<<< HEAD
 producto,categoria,codigo_barras,moneda_origen,costo_moneda_origen,costo_compra,precio_venta,inventario,punto_reorden,unidades_vendidas_hoy,ruta_imagen
-Coca-Cola 600ml,Bebidas,750105531000,MXN (Nacional),13.0,13.0,18.0,38,15,10,https://th.bing.com/th/id/R.7208c632951f3ba01588585270d9cfa8?rik=lCSr1x5sRQitkw&pid=ImgRaw&r=0
+Coca-Cola 600ml,Bebidas,750105531000,MXN (Nacional),13.0,13.0,18.0,39,15,10,https://th.bing.com/th/id/R.7208c632951f3ba01588585270d9cfa8?rik=lCSr1x5sRQitkw&pid=ImgRaw&r=0
 Gansito Marinela,Snacks,750105531001,MXN (Nacional),14.0,14.0,18.0,49,12,5,https://i5.walmartimages.com.mx/mg/gm/1p/images/product-images/img_large/00750100015310l.jpg
 Leche Alpura 1L,Lácteos,750105531002,MXN (Nacional),21.0,21.0,26.0,46,15,8,https://i5.walmartimages.com/asr/5364c041-c27e-48e9-bbaf-69a7d1d3ffa8.cceb39c374c107689e7c53d961687961.jpeg
 Frijol Pinto 1kg,Abarrotes,750105531003,MXN (Nacional),30.0,30.0,42.0,44,12,3,https://tse4.mm.bing.net/th/id/OIP.75lGGxGvtSk4Zpzc7RfhoQHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3
@@ -18,24 +17,3 @@ Baguette Artesanal 250g,Panadería,750105531014,MXN (Nacional),12.0,12.0,24.0,25
 Pan de Caja Integral 680g (Grande),Panadería,750105531015,MXN (Nacional),38.0,38.0,52.0,20,20,0,https://tse4.mm.bing.net/th/id/OIP.Yl98rjn78cEhQ_xUKOIADAHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3
 Pan Molido Clásico 250g,Panadería,750105531016,MXN (Nacional),14.0,14.0,22.0,30,20,0,https://www.movil.farmaciasguadalajara.com/wcsstore/FGCAS/wcs/products/305120_S_1280_F.jpg?w=88&h=88
 Pan Tostado Clásico 210g,Panadería,750105531017,MXN (Nacional),22.0,22.0,32.0,25,20,0,https://hiperabasto.mx/cdn/shop/files/PAN_TOSTADO_BIMBO_4018db41-b7d5-495e-9bb1-2fd0fd45a2d8.webp?v=1728344909&width=1214
-=======
-producto,categoria,costo_compra,precio_venta,unidades_vendidas_hoy,inventario
-Coca-Cola 600ml,Bebidas,13.0,18.0,10,39 
-Gansito Marinela,Snacks,14.0,18.0,5,50
-Leche Alpura 1L,Lácteos,21.0,26.0,8,47
-Frijol Pinto 1kg,Abarrotes,30.0,42.0,3,46
-Huevos (Docena),Abarrotes,28.0,38.0,4,48
-Pan Bimbo Blanco,Panadería,35.0,45.0,2,42
-Sabritas Sal 42g,Snacks,12.0,16.0,7,50
-Tortillas 1kg,Alimentos,18.0,22.0,15,49
-Atún Dolores en Agua,Abarrotes,16.0,21.0,4,50
-Cerveza Corona 355ml,Bebidas,15.0,22.0,12,50
-Bolillo Tradicional (Pza),Panadería,1.8,3.5,0,80
-Telera para Torta (Pza),Panadería,2.0,4.0,0,60
-Concha de Vainilla / Chocolate (Pza),Panadería,5.5,11.0,0,45
-Cuerno / Croissant Mantequilla (Pza),Panadería,7.0,14.0,0,35
-Baguette Artesanal 250g,Panadería,12.0,24.0,0,25
-Pan de Caja Integral 680g (Grande),Panadería,38.0,52.0,0,20
-Pan Molido Clásico 250g,Panadería,14.0,22.0,0,30
-Pan Tostado Clásico 210g,Panadería,22.0,32.0,0,25
->>>>>>> a4490044042da865e4c0ae3d1e834b2bf01588ac

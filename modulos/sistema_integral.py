@@ -131,6 +131,9 @@ def asegurar_columnas_productos(df_prod: pd.DataFrame, tc_usd: float = 19.85, tc
         return pd.DataFrame(columns=["producto", "categoria", "codigo_barras", "moneda_origen", "costo_moneda_origen", "costo_compra", "precio_venta", "inventario", "punto_reorden", "unidades_vendidas_hoy", "foto_url", "Estado Stock"])
 
     df = df_prod.copy().reset_index(drop=True)
+    df.columns = [str(c).strip() for c in df.columns]
+    if "producto" not in df.columns:
+        df["producto"] = "Nuevo Producto"
     df["producto"] = df["producto"].fillna("Nuevo Producto").astype(str)
     if "categoria" not in df.columns:
         df["categoria"] = "General"
